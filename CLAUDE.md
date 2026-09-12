@@ -89,15 +89,34 @@ issue carries the type.
 
 A human creates these labels in the repository settings.
 
-## Checks
+## Tests
 
-GitHub Actions runs the checks for each pull request. Run these two checks
-before you push.
+Run these commands before you push.
 
 ```sh
-./scripts/check-docs.sh
-./scripts/check-workflows.sh
+go test -race ./...           # the Go tests
+test/lab/run.sh               # labview in a browser, against a fake lab
+./scripts/check-docs.sh       # the markdown rules
+./scripts/check-workflows.sh  # the gate of each workflow
 ```
+
+`test/lab/run.sh` needs Node and Python in addition to Go.
+
+- Install the packages one time. Run `npm install` in `test/lab`. The script
+  does not install them.
+- Playwright needs a browser. `npx playwright install chromium` downloads one.
+  On a machine that has a browser already, set `CHROMIUM_PATH` to that
+  executable.
+- The script prints the directory of the screenshots. `SHOTS_DIR` selects a
+  different directory.
+
+A change of behavior comes with a test. `test/lab/README.md` says how to add a
+browser check, and it says why the browser layer exists.
+
+## Checks
+
+GitHub Actions runs the checks for each pull request. The Tests section lists
+the commands for a local machine.
 
 `checks.yml` runs three jobs.
 

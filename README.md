@@ -24,10 +24,12 @@ a proxy asserting an identity:
 
     test/lab/run.sh
 
-It needs Node and Python in addition to Go. Unit tests cannot reach the place
-where labview meets a browser, and that is where several of the more
-interesting bugs were; see `test/lab/README.md`. Both layers run in CI on
-every pull request.
+It needs Node and Python in addition to Go, and two one-time installs: `npm
+install` in `test/lab`, then `npx playwright install chromium`.
+
+Unit tests cannot reach the place where labview meets a browser, and that is
+where several of the more interesting bugs were; see `test/lab/README.md`.
+Both layers run in CI on every pull request.
 
 ### Run
 

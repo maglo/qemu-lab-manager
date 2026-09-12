@@ -4,10 +4,14 @@ A QEMU lab that isn't one: a minimal RFB server, unix sockets that print a
 plausible boot, and a reverse proxy that asserts an identity. Enough for
 labview to be driven in a real browser with no hypervisor anywhere.
 
+    npm install                        # once, in this directory
+    npx playwright install chromium    # once
     test/lab/run.sh
 
-Exits non-zero if any check fails. Screenshots land in a temp directory the
-run prints; set `SHOTS_DIR` to put them somewhere you choose.
+`run.sh` installs nothing. Exits non-zero if any check fails. Screenshots land
+in a temp directory the run prints; set `SHOTS_DIR` to put them somewhere you
+choose. A machine that has a browser already can skip the download: point
+`CHROMIUM_PATH` at the executable.
 
 ## Why this exists
 
