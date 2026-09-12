@@ -478,10 +478,16 @@ func TestRecordingDownloadRejectsTraversal(t *testing.T) {
 		t.Errorf("body = %q", rec.Body.String())
 	}
 
+	// A machine id may contain hyphens, so a capture belonging to a machine
+	// whose id merely starts with this one's must not be reachable either.
+	sibling := "el9-build-extra-20260912T100000Z.cast"
+	os.WriteFile(filepath.Join(h.dir, sibling), []byte("sibling"), 0o640)
+
 	for _, name := range []string{
 		"../secret.txt",
 		"..%2Fsecret.txt",
 		"other-20260912T100000Z.cast", // another machine's capture
+		sibling,                       // a machine whose id extends this one
 		"el9-build-20260912T100000Z.cast/../../secret.txt",
 		"passwd",
 	} {
@@ -491,6 +497,9 @@ func TestRecordingDownloadRejectsTraversal(t *testing.T) {
 		}
 		if rec.Code == http.StatusOK && strings.Contains(rec.Body.String(), "other") {
 			t.Errorf("%q read another machine's capture", name)
+		}
+		if rec.Code == http.StatusOK && strings.Contains(rec.Body.String(), "sibling") {
+			t.Errorf("%q read a capture belonging to a machine with a longer id", name)
 		}
 	}
 }
@@ -505,6 +514,11 @@ func TestRecordingsListing(t *testing.T) {
 		os.WriteFile(filepath.Join(h.dir, n), []byte("x"), 0o640)
 	}
 
+	// A machine whose id extends this one's; its captures belong to it.
+	os.WriteFile(filepath.Join(h.dir, "el9-build-extra-20260912T120000Z.cast"), []byte("x"), 0o640)
+	// And a file that is not a capture name at all.
+	os.WriteFile(filepath.Join(h.dir, "el9-build-notes.cast"), []byte("x"), 0o640)
+
 	rec := h.do("GET", "/api/machines/el9-build/recordings", "alice", nil)
 	var body struct {
 		Recordings []serial.Recording `json:"recordings"`
@@ -512,6 +526,11 @@ func TestRecordingsListing(t *testing.T) {
 	json.Unmarshal(rec.Body.Bytes(), &body)
 	if len(body.Recordings) != 2 {
 		t.Fatalf("got %d recordings, want 2: %+v", len(body.Recordings), body.Recordings)
+	}
+	for _, r := range body.Recordings {
+		if strings.Contains(r.Name, "extra") || strings.Contains(r.Name, "notes") {
+			t.Errorf("listing included %q, which is not this machine's capture", r.Name)
+		}
 	}
 	// Newest first.
 	if body.Recordings[0].Name < body.Recordings[1].Name {

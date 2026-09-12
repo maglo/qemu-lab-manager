@@ -301,3 +301,66 @@ func TestListRecordingsParsesStartTime(t *testing.T) {
 		t.Fatalf("Started = %v, want %v", recs[0].Started, want)
 	}
 }
+
+// A machine id may contain hyphens, so a bare prefix match on the filename
+// lets one machine see another's captures: "el9" is a prefix of
+// "el9-build-<stamp>.cast". The name has to be parsed, not just matched.
+func TestListRecordingsDoesNotMatchAnotherMachineByPrefix(t *testing.T) {
+	dir := t.TempDir()
+	stamp := time.Now().UTC().Format(transcriptTimeFormat)
+
+	mine := "el9-" + stamp + ".cast"
+	theirs := "el9-build-" + stamp + ".cast"
+	os.WriteFile(filepath.Join(dir, mine), []byte("mine"), 0o640)
+	os.WriteFile(filepath.Join(dir, theirs), []byte("theirs"), 0o640)
+
+	recs, err := ListRecordings(dir, "el9")
+	if err != nil {
+		t.Fatalf("ListRecordings: %v", err)
+	}
+	for _, r := range recs {
+		if r.Name == theirs {
+			t.Errorf("machine el9 sees el9-build's capture %q", r.Name)
+		}
+	}
+	if len(recs) != 1 || recs[0].Name != mine {
+		t.Fatalf("el9 recordings = %+v, want only %q", recs, mine)
+	}
+
+	// And the other way round: el9-build must not pick up el9's.
+	recs, _ = ListRecordings(dir, "el9-build")
+	if len(recs) != 1 || recs[0].Name != theirs {
+		t.Fatalf("el9-build recordings = %+v, want only %q", recs, theirs)
+	}
+}
+
+func TestRecordingBelongsTo(t *testing.T) {
+	stamp := "20260912T100000Z"
+	ok := []struct{ name, id string }{
+		{"el9-" + stamp + ".cast", "el9"},
+		{"el9-build-" + stamp + ".cast", "el9-build"},
+		{"el9-" + stamp + ".1.cast", "el9"}, // the collision suffix
+		{"kvm01.vm-" + stamp + ".cast", "kvm01.vm"},
+	}
+	for _, c := range ok {
+		if !RecordingBelongsTo(c.name, c.id) {
+			t.Errorf("RecordingBelongsTo(%q, %q) = false, want true", c.name, c.id)
+		}
+	}
+
+	bad := []struct{ name, id string }{
+		{"el9-build-" + stamp + ".cast", "el9"}, // another machine
+		{"el9-" + stamp + ".cast", "el9-build"}, // ditto, reversed
+		{"el9-notatimestamp.cast", "el9"},       // not a capture name
+		{"el9.cast", "el9"},                     // no timestamp
+		{"../secret-" + stamp + ".cast", "el9"}, // traversal
+		{"el9-" + stamp + ".cast.txt", "el9"},   // wrong extension
+		{"el9-" + stamp, "el9"},                 // no extension
+		{"", "el9"},
+	}
+	for _, c := range bad {
+		if RecordingBelongsTo(c.name, c.id) {
+			t.Errorf("RecordingBelongsTo(%q, %q) = true, want false", c.name, c.id)
+		}
+	}
+}
