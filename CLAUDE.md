@@ -4,9 +4,21 @@ Rules for agents and humans who work in this repository.
 
 ## Repository
 
-qemu-lab-manager holds the tooling for the QEMU lab. `docs/design/` holds one
-design document for each component. The repository is design only today. Code
-comes later.
+qemu-lab-manager holds the tooling for the QEMU lab. It builds one Go binary,
+`labview`.
+
+| Path | Content |
+|---|---|
+| `cmd/labview` | The main package. |
+| `internal/` | The packages of the service. |
+| `internal/web/static` | The browser application. |
+| `docs/design/` | One design document for each component. |
+| `test/lab` | The fake lab and the browser checks. |
+| `deploy/` | The systemd unit, the polkit rule and the nginx file. |
+| `scripts/` | The check scripts. |
+
+A design document gives the reason for a decision. `README.md` gives the build
+command and the run command.
 
 ## Workflow
 
