@@ -1,8 +1,8 @@
 // Package web serves labview's browser application.
 //
 // The whole UI is embedded in the binary, because labview is one binary with
-// one inventory file (design preamble) and a lab is not expected to reach a
-// CDN.
+// one inventory directory (design preamble) and a lab is not expected to
+// reach a CDN.
 package web
 
 import (

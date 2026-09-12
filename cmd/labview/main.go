@@ -1,6 +1,7 @@
 // Command labview serves a console wall for a QEMU lab.
 //
-// One binary, one inventory file, no database. See docs/design/labview.md.
+// One binary, one inventory directory, no database. See
+// docs/design/labview.md.
 package main
 
 import (
@@ -70,14 +71,14 @@ func run(args []string) error {
 	defer stop()
 
 	// The inventory must load before anything else: starting with no
-	// machines because the operator fat-fingered the file would look like a
+	// machines because the operator fat-fingered a file would look like a
 	// working but empty lab.
-	watcher, err := inventory.NewWatcher(cfg.InventoryPath, cfg.InventoryPoll, log)
+	watcher, err := inventory.NewWatcher(cfg.InventoryDir, cfg.InventoryRescan, log)
 	if err != nil {
-		return fmt.Errorf("inventory %s: %w", cfg.InventoryPath, err)
+		return fmt.Errorf("inventory %s: %w", cfg.InventoryDir, err)
 	}
 	log.Info("inventory loaded",
-		"path", cfg.InventoryPath, "machines", watcher.Current().Len())
+		"dir", cfg.InventoryDir, "machines", watcher.Current().Len())
 
 	hosts, err := newHostAccess(cfg, log)
 	if err != nil {

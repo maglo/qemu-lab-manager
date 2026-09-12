@@ -125,20 +125,20 @@ func newWSHarness(t *testing.T) *wsHarness {
 	v := newVM(t)
 
 	dir := t.TempDir()
-	invPath := filepath.Join(dir, "inventory.json")
-	doc := fmt.Sprintf(`[{"id":"vm1","name":"vm1","serial":%q,"unit":"qemu-vm1.service"}]`, v.serialPath)
-	if err := os.WriteFile(invPath, []byte(doc), 0o640); err != nil {
+	doc := fmt.Sprintf("name: vm1\nserial: %s\nunit: qemu-vm1.service\n", v.serialPath)
+	if err := os.WriteFile(filepath.Join(dir, "vm1.yaml"), []byte(doc), 0o640); err != nil {
 		t.Fatal(err)
 	}
 
 	log := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))
-	w, err := inventory.NewWatcher(invPath, time.Hour, log)
+	w, err := inventory.NewWatcher(dir, time.Hour, log)
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { w.Close() })
 
 	cfg := config.Default()
-	cfg.InventoryPath = invPath
+	cfg.InventoryDir = dir
 	cfg.TranscriptDir = ""
 	cfg.LeaseIdle = time.Minute
 	cfg.LeaseWarn = 10 * time.Second

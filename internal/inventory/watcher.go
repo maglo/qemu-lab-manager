@@ -2,66 +2,113 @@ package inventory
 
 import (
 	"context"
+	"errors"
 	"log/slog"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 )
 
-// DefaultPollInterval is how often the watcher stats the inventory file.
-// Polling rather than inotify because the design asks only for "re-reads it
-// when the mtime changes", and a producer that writes by rename (as a playbook
-// does) defeats a watch on the inode anyway.
-const DefaultPollInterval = 2 * time.Second
+// DefaultRescan is how often the watcher reads the inventory directory again
+// without being told to.
+const DefaultRescan = 2 * time.Second
 
-// Watcher keeps a Set loaded from disk, reloading on mtime change.
+// settleDelay coalesces a burst of file events into one scan. A playbook that
+// writes ten machines writes ten files, and the wall wants one reload, not
+// ten. It is short enough that a person who saves a file sees the change
+// before they reach the browser.
+const settleDelay = 50 * time.Millisecond
+
+// Watcher keeps a Set loaded from the inventory directory.
 //
-// A failed reload is logged and discarded: the last good set stays live. A
-// half-written inventory should not take the console wall down.
+// The directory is watched, so a new file and a deleted file reach the wall
+// at once. A periodic scan runs as well, because a watch can be lost: the
+// directory is replaced, or it lives on a filesystem that reports nothing.
+//
+// A file that does not load is logged and keeps its previous entry live. One
+// machine's typo takes down one machine, and a half-written file takes down
+// nothing.
 type Watcher struct {
-	path     string
-	interval time.Duration
-	log      *slog.Logger
+	dir    string
+	rescan time.Duration
+	log    *slog.Logger
 
 	current atomic.Pointer[Set]
 
-	mu       sync.Mutex
-	lastMod  time.Time
-	lastSize int64
-	subs     []chan struct{}
+	// loader, fsw and watching belong to the goroutine running Run, and to
+	// NewWatcher before that goroutine starts.
+	loader   *loader
+	fsw      *fsnotify.Watcher
+	watching bool
+
+	mu     sync.Mutex
+	failed []string
+	subs   []chan struct{}
 }
 
-// NewWatcher loads the inventory once and returns a watcher holding it. The
-// initial load must succeed -- starting with no machines because the operator
-// fat-fingered the file would look like a working but empty lab.
-func NewWatcher(path string, interval time.Duration, log *slog.Logger) (*Watcher, error) {
-	if interval <= 0 {
-		interval = DefaultPollInterval
+// NewWatcher reads the directory once and returns a watcher holding it. The
+// first read must succeed -- starting with no machines because the operator
+// fat-fingered a file would look like a working but empty lab.
+//
+// The watch starts before that first read, so a file written while labview
+// starts is not missed.
+func NewWatcher(dir string, rescan time.Duration, log *slog.Logger) (*Watcher, error) {
+	if rescan <= 0 {
+		rescan = DefaultRescan
 	}
 	if log == nil {
 		log = slog.Default()
 	}
-	w := &Watcher{path: path, interval: interval, log: log}
+	w := &Watcher{dir: dir, rescan: rescan, log: log, loader: newLoader(dir)}
 
-	set, err := Load(path)
+	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
-		return nil, err
+		w.log.Warn("cannot watch the inventory directory, rescanning only",
+			"dir", dir, "interval", rescan, "error", err)
+	} else {
+		w.fsw = fsw
+		w.watching = w.watch()
+	}
+
+	set, _, errs := w.loader.scan()
+	if len(errs) > 0 {
+		w.Close()
+		return nil, errors.Join(errs...)
 	}
 	w.current.Store(set)
-	if fi, err := os.Stat(path); err == nil {
-		w.lastMod, w.lastSize = fi.ModTime(), fi.Size()
-	}
 	return w, nil
+}
+
+// Close stops the watch. Run closes the watch when its context ends, so only
+// a caller that never runs the watcher needs this.
+func (w *Watcher) Close() error {
+	if w.fsw == nil {
+		return nil
+	}
+	return w.fsw.Close()
 }
 
 // Current returns the live set. Callers hold the returned snapshot for as
 // long as they like; a reload replaces the pointer rather than mutating it.
 func (w *Watcher) Current() *Set { return w.current.Load() }
 
-// Subscribe returns a channel notified after each successful reload. The
-// channel is buffered and coalescing: a subscriber that is busy sees one
-// wakeup, not a queue of them, which is what broker reconciliation wants.
+// Failed names the files of the last scan that did not load. Only the names:
+// a message can quote a value from the file, and section 6 keeps the
+// addresses off every client.
+func (w *Watcher) Failed() []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	out := make([]string, len(w.failed))
+	copy(out, w.failed)
+	return out
+}
+
+// Subscribe returns a channel notified after each reload that changes
+// something. The channel is buffered and coalescing: a subscriber that is
+// busy sees one wakeup, not a queue of them, which is what broker
+// reconciliation wants.
 func (w *Watcher) Subscribe() <-chan struct{} {
 	ch := make(chan struct{}, 1)
 	w.mu.Lock()
@@ -70,55 +117,101 @@ func (w *Watcher) Subscribe() <-chan struct{} {
 	return ch
 }
 
-// Run polls until the context is cancelled.
+// Run watches the directory until the context is cancelled.
 func (w *Watcher) Run(ctx context.Context) {
-	t := time.NewTicker(w.interval)
-	defer t.Stop()
+	defer w.Close()
+
+	var (
+		events   chan fsnotify.Event
+		failures chan error
+	)
+	if w.fsw != nil {
+		events, failures = w.fsw.Events, w.fsw.Errors
+	}
+
+	ticker := time.NewTicker(w.rescan)
+	defer ticker.Stop()
+
+	var settle <-chan time.Time
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-t.C:
-			w.reloadIfChanged()
+
+		case event, ok := <-events:
+			if !ok {
+				events = nil
+				continue
+			}
+			// A permission change leaves the content alone.
+			if event.Op == fsnotify.Chmod {
+				continue
+			}
+			if event.Name == w.dir && event.Has(fsnotify.Remove|fsnotify.Rename) {
+				w.watching = false
+			}
+			settle = time.After(settleDelay)
+
+		case err, ok := <-failures:
+			if !ok {
+				failures = nil
+				continue
+			}
+			w.log.Warn("the inventory watch reported an error", "dir", w.dir, "error", err)
+
+		case <-settle:
+			settle = nil
+			w.reload()
+
+		case <-ticker.C:
+			if w.fsw != nil && !w.watching {
+				w.watching = w.watch()
+			}
+			w.reload()
 		}
 	}
 }
 
-func (w *Watcher) reloadIfChanged() {
-	fi, err := os.Stat(w.path)
-	if err != nil {
-		w.log.Warn("inventory stat failed", "path", w.path, "error", err)
+func (w *Watcher) watch() bool {
+	if err := w.fsw.Add(w.dir); err != nil {
+		w.log.Warn("cannot watch the inventory directory, rescanning only",
+			"dir", w.dir, "interval", w.rescan, "error", err)
+		return false
+	}
+	return true
+}
+
+func (w *Watcher) reload() {
+	set, changed, errs := w.loader.scan()
+	if set == nil {
+		// The directory itself is gone or unreadable. Keep the live set:
+		// the machines are still running, whatever the filesystem says.
+		w.log.Warn("cannot read the inventory directory, keeping the live machines",
+			"dir", w.dir, "error", errors.Join(errs...))
+		return
+	}
+	if !changed {
 		return
 	}
 
-	w.mu.Lock()
-	unchanged := fi.ModTime().Equal(w.lastMod) && fi.Size() == w.lastSize
-	w.mu.Unlock()
-	if unchanged {
-		return
-	}
-
-	set, err := Load(w.path)
-	if err != nil {
-		// Note the mtime anyway. Otherwise a file that stays broken is
-		// re-read and re-logged on every tick.
-		w.mu.Lock()
-		w.lastMod, w.lastSize = fi.ModTime(), fi.Size()
-		w.mu.Unlock()
-		w.log.Error("inventory reload failed, keeping previous set",
-			"path", w.path, "error", err)
-		return
+	failed := make([]string, 0, len(errs))
+	for _, err := range errs {
+		w.log.Error("a machine file did not load", "dir", w.dir, "error", err)
+		var fail *FileError
+		if errors.As(err, &fail) {
+			failed = append(failed, fail.Name)
+		}
 	}
 
 	w.current.Store(set)
 
 	w.mu.Lock()
-	w.lastMod, w.lastSize = fi.ModTime(), fi.Size()
+	w.failed = failed
 	subs := make([]chan struct{}, len(w.subs))
 	copy(subs, w.subs)
 	w.mu.Unlock()
 
-	w.log.Info("inventory reloaded", "path", w.path, "machines", set.Len())
+	w.log.Info("inventory reloaded", "dir", w.dir, "machines", set.Len(), "failed", len(failed))
 	for _, ch := range subs {
 		select {
 		case ch <- struct{}{}:

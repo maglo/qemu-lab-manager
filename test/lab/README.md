@@ -31,8 +31,12 @@ So this drives the real thing and asserts on what a developer would see.
 | `fakevnc.py` | RFB 3.8 server: handshake, one framebuffer, and it logs any input it receives — which is how "a viewer cannot type" is checked |
 | `fakeserial.py` | A unix socket that prints a boot with ANSI colour, then echoes what is typed at it |
 | `proxy.js` | Stands in for design section 10: terminates the browser's connection, asserts `X-Forwarded-User`, forwards the original `Host` |
-| `inventory.json` | Four machines: one with both channels, one serial-only, one switched off, one with neither |
+| `machines/` | Four machine files: one with both channels, one serial-only, one switched off, one with neither |
 | `drive.js` | The checks |
+
+`run.sh` copies `machines/` to a temporary directory. The checks write a new
+machine file there and delete it again, which is how "labview follows the
+directory" is checked.
 
 ## The proxy is not incidental
 

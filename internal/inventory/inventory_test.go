@@ -11,28 +11,20 @@ import (
 	"time"
 )
 
-const designExample = `[
-  {
-    "id": "el9-build",
-    "name": "el9-build",
-    "host": "kvm01",
-    "vnc": "10.20.0.11:5901",
-    "serial": "/run/qemu/el9-build-serial.sock",
-    "notes": "AlmaLinux 9"
-  }
-]`
+const designExample = `name: el9-build
+host: kvm01
+vnc: 10.20.0.11:5901
+serial: /run/qemu/el9-build-serial.sock
+notes: AlmaLinux 9
+`
 
 func TestParseDesignExample(t *testing.T) {
-	set, err := Parse([]byte(designExample))
+	m, err := ParseMachine("el9-build", []byte(designExample))
 	if err != nil {
-		t.Fatalf("Parse: %v", err)
+		t.Fatalf("ParseMachine: %v", err)
 	}
-	if set.Len() != 1 {
-		t.Fatalf("got %d machines, want 1", set.Len())
-	}
-	m, ok := set.Get("el9-build")
-	if !ok {
-		t.Fatal("machine not found by id")
+	if m.ID != "el9-build" {
+		t.Fatalf("id = %q, want the file name", m.ID)
 	}
 	if m.Host != "kvm01" || m.VNC != "10.20.0.11:5901" {
 		t.Fatalf("unexpected machine: %+v", m)
@@ -54,13 +46,15 @@ func TestParseDesignExample(t *testing.T) {
 // the serialised bytes rather than on field names, so a future field carrying
 // an address is caught too.
 func TestViewNeverLeaksAddresses(t *testing.T) {
-	set, err := Parse([]byte(`[
-	  {"id":"m","name":"m","host":"kvm01","vnc":"10.20.0.11:5901",
-	   "serial":"/run/qemu/m.sock","unit":"qemu-m.service","notes":"n"}
-	]`))
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
+	set := mustLoad(t, map[string]string{
+		"m.yaml": `name: m
+host: kvm01
+vnc: 10.20.0.11:5901
+serial: /run/qemu/m.sock
+unit: qemu-m.service
+notes: n
+`,
+	})
 
 	blob, err := json.Marshal(set.Views())
 	if err != nil {
@@ -82,8 +76,9 @@ func TestViewNeverLeaksAddresses(t *testing.T) {
 	}
 }
 
-// An id becomes a URL path element and a transcript filename, so traversal
-// attempts must be rejected at load rather than escaped at each use.
+// An id becomes a URL path element and a transcript filename, so a file whose
+// name is not usable as an id must be rejected rather than escaped at each
+// use.
 func TestParseRejectsDangerousIDs(t *testing.T) {
 	for _, id := range []string{
 		"../etc/passwd",
@@ -96,8 +91,7 @@ func TestParseRejectsDangerousIDs(t *testing.T) {
 		"a;b",
 		"a\x00b",
 	} {
-		doc := `[{"id":` + mustJSON(id) + `,"serial":"/run/a.sock"}]`
-		if _, err := Parse([]byte(doc)); err == nil {
+		if _, err := ParseMachine(id, []byte("serial: /run/a.sock\n")); err == nil {
 			t.Errorf("id %q was accepted", id)
 		}
 	}
@@ -105,10 +99,21 @@ func TestParseRejectsDangerousIDs(t *testing.T) {
 
 func TestParseAcceptsReasonableIDs(t *testing.T) {
 	for _, id := range []string{"el9-build", "kvm01.vm", "a_b", "A1", "9lives"} {
-		doc := `[{"id":` + mustJSON(id) + `}]`
-		if _, err := Parse([]byte(doc)); err != nil {
+		if _, err := ParseMachine(id, nil); err != nil {
 			t.Errorf("id %q was rejected: %v", id, err)
 		}
+	}
+}
+
+// The file name is the one place the id comes from. A file that sets one too
+// would let the name on disk and the name in the API drift apart.
+func TestParseRejectsAnIDInTheFile(t *testing.T) {
+	_, err := ParseMachine("a", []byte("id: b\n"))
+	if err == nil {
+		t.Fatal("a file naming its own machine was accepted")
+	}
+	if !strings.Contains(err.Error(), "file name") {
+		t.Fatalf("unhelpful error: %v", err)
 	}
 }
 
@@ -119,64 +124,128 @@ func TestParseRejectsBadUnitNames(t *testing.T) {
 		"../../qemu.service",
 		"qemu m.service",
 	} {
-		doc := `[{"id":"m","unit":` + mustJSON(unit) + `}]`
-		if _, err := Parse([]byte(doc)); err == nil {
+		doc := "unit: " + mustJSON(unit) + "\n"
+		if _, err := ParseMachine("m", []byte(doc)); err == nil {
 			t.Errorf("unit %q was accepted", unit)
 		}
 	}
 	for _, unit := range []string{"qemu-el9.service", "machine@el9.service", "lab.target", "vm.socket"} {
-		doc := `[{"id":"m","unit":` + mustJSON(unit) + `}]`
-		if _, err := Parse([]byte(doc)); err != nil {
+		doc := "unit: " + mustJSON(unit) + "\n"
+		if _, err := ParseMachine("m", []byte(doc)); err != nil {
 			t.Errorf("unit %q was rejected: %v", unit, err)
 		}
 	}
 }
 
-func TestParseRejectsDuplicateIDs(t *testing.T) {
-	_, err := Parse([]byte(`[{"id":"a"},{"id":"a"}]`))
-	if err == nil {
-		t.Fatal("duplicate id accepted")
-	}
-	if !strings.Contains(err.Error(), "duplicate") {
-		t.Fatalf("unhelpful error: %v", err)
-	}
-}
-
 func TestParseRejectsMalformedAddresses(t *testing.T) {
-	if _, err := Parse([]byte(`[{"id":"a","vnc":"10.0.0.1"}]`)); err == nil {
+	if _, err := ParseMachine("a", []byte("vnc: 10.0.0.1\n")); err == nil {
 		t.Error("vnc without a port was accepted")
 	}
-	if _, err := Parse([]byte(`[{"id":"a","serial":"not-a-socket"}]`)); err == nil {
+	if _, err := ParseMachine("a", []byte("serial: not-a-socket\n")); err == nil {
 		t.Error("serial that is neither a path nor host:port was accepted")
 	}
 }
 
-// A producer newer than labview may write fields labview does not model. That
-// must not break the load, and the unknown field must still be visible on the
-// details tab.
-func TestParseKeepsUnknownFieldsVerbatim(t *testing.T) {
-	doc := `[{"id":"a","name":"a","tags":["build","el9"],"future":42}]`
-	set, err := Parse([]byte(doc))
-	if err != nil {
-		t.Fatalf("Parse rejected a forward-compatible entry: %v", err)
-	}
-	m, _ := set.Get("a")
-	if !strings.Contains(string(m.Raw), "tags") || !strings.Contains(string(m.Raw), "future") {
-		t.Fatalf("raw entry lost unknown fields: %s", m.Raw)
+func TestParseRejectsADocumentThatIsNotAMapping(t *testing.T) {
+	if _, err := ParseMachine("a", []byte("- one\n- two\n")); err == nil {
+		t.Fatal("a YAML list was accepted as a machine")
 	}
 }
 
-func TestParseRejectsNonArray(t *testing.T) {
-	if _, err := Parse([]byte(`{"id":"a"}`)); err == nil {
-		t.Fatal("a JSON object was accepted as an inventory")
+// A producer newer than labview may write settings labview does not model.
+// That must not break the load, and the setting must still be visible on the
+// details tab.
+func TestParseKeepsUnknownSettingsVerbatim(t *testing.T) {
+	doc := `name: a
+tags:
+  - build
+  - el9
+future: 42
+`
+	m, err := ParseMachine("a", []byte(doc))
+	if err != nil {
+		t.Fatalf("ParseMachine rejected a forward-compatible file: %v", err)
+	}
+	blob, err := json.Marshal(m.Entry)
+	if err != nil {
+		t.Fatalf("the entry does not survive JSON: %v", err)
+	}
+	if !strings.Contains(string(blob), "tags") || !strings.Contains(string(blob), "future") {
+		t.Fatalf("the entry lost unknown settings: %s", blob)
+	}
+}
+
+// The details tab serialises the entry as JSON, so a key JSON cannot carry
+// must fail at load rather than when a record is served.
+func TestParseRejectsAKeyJSONCannotCarry(t *testing.T) {
+	if _, err := ParseMachine("a", []byte("extra:\n  ? [1, 2]\n  : three\n")); err == nil {
+		t.Fatal("a mapping with a list for a key was accepted")
+	}
+}
+
+func TestParseAcceptsAnEmptyFile(t *testing.T) {
+	m, err := ParseMachine("a", nil)
+	if err != nil {
+		t.Fatalf("an empty file was rejected: %v", err)
+	}
+	if m.ID != "a" || m.HasConsole() || m.HasSerial() || m.CanPower() {
+		t.Fatalf("unexpected machine: %+v", m)
 	}
 }
 
 func TestDisplayNameFallsBackToID(t *testing.T) {
-	set, _ := Parse([]byte(`[{"id":"a"}]`))
-	m, _ := set.Get("a")
+	m, _ := ParseMachine("a", nil)
 	if got := m.DisplayName(); got != "a" {
 		t.Fatalf("DisplayName = %q, want %q", got, "a")
+	}
+}
+
+func TestLoadDirReadsOneFilePerMachine(t *testing.T) {
+	set := mustLoad(t, map[string]string{
+		"b.yaml":      "serial: /run/b.sock\n",
+		"a.yaml":      "serial: /run/a.sock\n",
+		"c.yml":       "serial: /run/c.sock\n",
+		"README.md":   "not a machine\n",
+		".draft.yaml": "serial: /run/draft.sock\n",
+	})
+	if set.Len() != 3 {
+		t.Fatalf("got %d machines, want 3", set.Len())
+	}
+	// File order is id order, and the wall shows the set as it comes.
+	var ids []string
+	for _, m := range set.Machines() {
+		ids = append(ids, m.ID)
+	}
+	if strings.Join(ids, ",") != "a,b,c" {
+		t.Fatalf("machines are in %v, want a,b,c", ids)
+	}
+}
+
+// Both suffixes name the same machine, so one of the two files must lose.
+func TestLoadDirRejectsTwoFilesForOneMachine(t *testing.T) {
+	dir := writeDir(t, map[string]string{
+		"a.yaml": "serial: /run/a.sock\n",
+		"a.yml":  "serial: /run/other.sock\n",
+	})
+	_, err := LoadDir(dir)
+	if err == nil {
+		t.Fatal("two files for one machine were accepted")
+	}
+	if !strings.Contains(err.Error(), "already comes from") {
+		t.Fatalf("unhelpful error: %v", err)
+	}
+}
+
+func TestLoadDirFailsOnABadFile(t *testing.T) {
+	dir := writeDir(t, map[string]string{
+		"good.yaml": "serial: /run/good.sock\n",
+		"bad.yaml":  "serial: [not, a, socket]\n",
+	})
+	if _, err := LoadDir(dir); err == nil {
+		t.Fatal("a bad file loaded")
+	}
+	if _, err := LoadDir(filepath.Join(dir, "absent")); err == nil {
+		t.Fatal("a directory that does not exist loaded")
 	}
 }
 
@@ -184,12 +253,12 @@ func discard() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))
 }
 
-func TestWatcherReloadsOnChange(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "inventory.json")
-	os.WriteFile(path, []byte(`[{"id":"a"}]`), 0o640)
+// A new file and a deleted file must reach the wall at once, so the watch
+// carries them long before the backstop scan would.
+func TestWatcherSeesANewAndADeletedFile(t *testing.T) {
+	dir := writeDir(t, map[string]string{"a.yaml": "serial: /run/a.sock\n"})
 
-	w, err := NewWatcher(path, 10*time.Millisecond, discard())
+	w, err := NewWatcher(dir, time.Hour, discard())
 	if err != nil {
 		t.Fatalf("NewWatcher: %v", err)
 	}
@@ -198,27 +267,31 @@ func TestWatcherReloadsOnChange(t *testing.T) {
 	go w.Run(ctx)
 
 	changed := w.Subscribe()
-
-	time.Sleep(20 * time.Millisecond)
-	os.WriteFile(path, []byte(`[{"id":"a"},{"id":"b"}]`), 0o640)
-
-	select {
-	case <-changed:
-	case <-time.After(3 * time.Second):
-		t.Fatal("no reload notification")
-	}
+	write(t, dir, "b.yaml", "serial: /run/b.sock\n")
+	waitForChange(t, changed)
 	if w.Current().Len() != 2 {
-		t.Fatalf("reloaded set has %d machines, want 2", w.Current().Len())
+		t.Fatalf("the new machine is missing: %d machines", w.Current().Len())
+	}
+
+	if err := os.Remove(filepath.Join(dir, "b.yaml")); err != nil {
+		t.Fatal(err)
+	}
+	waitForChange(t, changed)
+	if _, ok := w.Current().Get("b"); ok {
+		t.Fatal("the deleted machine is still live")
 	}
 }
 
-// A half-written or invalid inventory must not take the console wall down.
-func TestWatcherKeepsPreviousSetOnBadFile(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "inventory.json")
-	os.WriteFile(path, []byte(`[{"id":"good"}]`), 0o640)
+// A file that goes bad takes down one machine at most, and not even that one:
+// the entry that last loaded stays live, so a half-written file does not stop
+// a running broker.
+func TestWatcherKeepsTheLastGoodEntry(t *testing.T) {
+	dir := writeDir(t, map[string]string{
+		"good.yaml":  "name: good\nserial: /run/good.sock\n",
+		"other.yaml": "name: other\n",
+	})
 
-	w, err := NewWatcher(path, 10*time.Millisecond, discard())
+	w, err := NewWatcher(dir, time.Hour, discard())
 	if err != nil {
 		t.Fatalf("NewWatcher: %v", err)
 	}
@@ -226,37 +299,95 @@ func TestWatcherKeepsPreviousSetOnBadFile(t *testing.T) {
 	defer cancel()
 	go w.Run(ctx)
 
-	time.Sleep(20 * time.Millisecond)
-	os.WriteFile(path, []byte(`[{"id":"good"`), 0o640) // truncated write
-	time.Sleep(100 * time.Millisecond)
+	changed := w.Subscribe()
+	write(t, dir, "good.yaml", "name: good\nserial: [half written")
+	waitForChange(t, changed)
 
-	if w.Current().Len() != 1 {
-		t.Fatalf("bad file changed the live set: %d machines", w.Current().Len())
-	}
-	if _, ok := w.Current().Get("good"); !ok {
-		t.Fatal("previously good machine disappeared")
-	}
-
-	// And it recovers once the file is valid again.
-	os.WriteFile(path, []byte(`[{"id":"good"},{"id":"better"}]`), 0o640)
-	deadline := time.Now().Add(3 * time.Second)
-	for w.Current().Len() != 2 && time.Now().Before(deadline) {
-		time.Sleep(5 * time.Millisecond)
-	}
 	if w.Current().Len() != 2 {
-		t.Fatal("watcher did not recover after the file was fixed")
+		t.Fatalf("a bad file changed the live set: %d machines", w.Current().Len())
+	}
+	m, ok := w.Current().Get("good")
+	if !ok || m.Serial != "/run/good.sock" {
+		t.Fatalf("the last good entry is gone: %+v", m)
+	}
+	if failed := w.Failed(); len(failed) != 1 || failed[0] != "good.yaml" {
+		t.Fatalf("the failed file is not reported by name: %v", failed)
+	}
+
+	// And it recovers once the file is written fully.
+	write(t, dir, "good.yaml", "name: good\nserial: /run/better.sock\n")
+	waitForChange(t, changed)
+	if m, _ := w.Current().Get("good"); m.Serial != "/run/better.sock" {
+		t.Fatalf("the fixed file did not take: %+v", m)
+	}
+	if len(w.Failed()) != 0 {
+		t.Fatalf("the fixed file is still reported as failed: %v", w.Failed())
 	}
 }
 
-func TestNewWatcherFailsOnBadInitialFile(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "inventory.json")
-	os.WriteFile(path, []byte(`nonsense`), 0o640)
-	if _, err := NewWatcher(path, time.Second, discard()); err == nil {
-		t.Fatal("watcher started with an unreadable inventory")
+// The backstop scan carries a change that the watch missed.
+func TestWatcherRescansWithoutTheWatch(t *testing.T) {
+	dir := writeDir(t, map[string]string{"a.yaml": ""})
+
+	w, err := NewWatcher(dir, 10*time.Millisecond, discard())
+	if err != nil {
+		t.Fatalf("NewWatcher: %v", err)
 	}
-	if _, err := NewWatcher(filepath.Join(dir, "absent.json"), time.Second, discard()); err == nil {
-		t.Fatal("watcher started with no inventory file")
+	changed := w.Subscribe()
+
+	// Run the backstop alone: the file appears before the watch starts.
+	write(t, dir, "b.yaml", "")
+	ctx, cancel := contextWithCancel()
+	defer cancel()
+	go w.Run(ctx)
+
+	waitForChange(t, changed)
+	if w.Current().Len() != 2 {
+		t.Fatalf("the rescan missed a file: %d machines", w.Current().Len())
+	}
+}
+
+func TestNewWatcherFailsOnABadDirectory(t *testing.T) {
+	dir := writeDir(t, map[string]string{"a.yaml": "unit: nonsense\n"})
+	if _, err := NewWatcher(dir, time.Second, discard()); err == nil {
+		t.Fatal("the watcher started with an unreadable machine file")
+	}
+	if _, err := NewWatcher(filepath.Join(dir, "absent"), time.Second, discard()); err == nil {
+		t.Fatal("the watcher started with no inventory directory")
+	}
+}
+
+func writeDir(t *testing.T, files map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for name, body := range files {
+		write(t, dir, name, body)
+	}
+	return dir
+}
+
+func write(t *testing.T, dir, name, body string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o640); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func mustLoad(t *testing.T, files map[string]string) *Set {
+	t.Helper()
+	set, err := LoadDir(writeDir(t, files))
+	if err != nil {
+		t.Fatalf("LoadDir: %v", err)
+	}
+	return set
+}
+
+func waitForChange(t *testing.T, changed <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-changed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("no reload notification")
 	}
 }
 

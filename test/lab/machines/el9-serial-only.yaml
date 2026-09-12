@@ -1,0 +1,5 @@
+name: el9-serial-only
+host: kvm01
+serial: /tmp/labview-lab/serial-only.sock
+unit: qemu-serial-only.service
+notes: No framebuffer worth showing

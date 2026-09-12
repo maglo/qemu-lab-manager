@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -142,8 +141,8 @@ type machineRecord struct {
 
 	Details host.Details `json:"details"`
 
-	// Inventory is the machine's entry in the inventory file, verbatim,
-	// minus the fields that never reach a browser.
+	// Inventory is the machine's file as written, plus the id its name
+	// gives, minus the fields that never reach a browser.
 	Inventory map[string]any `json:"inventory"`
 
 	Recordings []serial.Recording `json:"recordings"`
@@ -179,20 +178,21 @@ func (s *Server) handleMachine(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, rec)
 }
 
-// redactedEntry returns the inventory entry as written, with the two address
-// fields section 6 names replaced by a marker.
+// redactedEntry returns the machine's file as written, with the id its name
+// gives, and with the two address fields section 6 names replaced by a
+// marker.
 //
 // The unit name is *not* withheld: section 8 lists it among the things the
 // details tab shows. Section 12's rule is that a client never *names* a unit
 // in a request, which is about the request path -- labview maps an id to a
 // unit itself and will only touch units the inventory gave it.
 func redactedEntry(m inventory.Machine) map[string]any {
-	entry := map[string]any{}
-	if len(m.Raw) > 0 {
-		if err := json.Unmarshal(m.Raw, &entry); err != nil {
-			entry = map[string]any{}
-		}
+	// Copy: the machine holds the file the whole set shares.
+	entry := make(map[string]any, len(m.Entry)+1)
+	for k, v := range m.Entry {
+		entry[k] = v
 	}
+	entry["id"] = m.ID
 	for _, address := range []string{"vnc", "serial"} {
 		if _, present := entry[address]; present {
 			// Say that something was withheld rather than silently
@@ -332,8 +332,12 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	// A machine file that does not load leaves the other machines running,
+	// so the only sign of it is the log. Say so here as well, where a
+	// monitor can see it.
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":       true,
 		"machines": s.inventory.Current().Len(),
+		"failed":   s.inventory.Failed(),
 	})
 }

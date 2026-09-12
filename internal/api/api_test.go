@@ -24,30 +24,28 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
 )
 
-const testInventory = `[
-  {
-    "id": "el9-build",
-    "name": "el9-build",
-    "host": "kvm01",
-    "vnc": "10.20.0.11:5901",
-    "serial": "/run/qemu/el9-build-serial.sock",
-    "unit": "qemu-el9-build.service",
-    "notes": "AlmaLinux 9",
-    "tags": ["build", "el9"]
-  },
-  {
-    "id": "serial-only",
-    "name": "serial-only",
-    "host": "kvm01",
-    "serial": "/run/qemu/serial-only.sock"
-  },
-  {
-    "id": "no-unit",
-    "name": "no-unit",
-    "host": "kvm01",
-    "vnc": "10.20.0.12:5902"
-  }
-]`
+// testInventory is one file per machine, as the inventory directory holds
+// them.
+var testInventory = map[string]string{
+	"el9-build": `name: el9-build
+host: kvm01
+vnc: 10.20.0.11:5901
+serial: /run/qemu/el9-build-serial.sock
+unit: qemu-el9-build.service
+notes: AlmaLinux 9
+tags:
+  - build
+  - el9
+`,
+	"serial-only": `name: serial-only
+host: kvm01
+serial: /run/qemu/serial-only.sock
+`,
+	"no-unit": `name: no-unit
+host: kvm01
+vnc: 10.20.0.12:5902
+`,
+}
 
 type harness struct {
 	srv      *Server
@@ -62,9 +60,14 @@ func newHarness(t *testing.T) *harness {
 	t.Helper()
 
 	dir := t.TempDir()
-	invPath := filepath.Join(dir, "inventory.json")
-	if err := os.WriteFile(invPath, []byte(testInventory), 0o640); err != nil {
+	invDir := filepath.Join(dir, "inventory.d")
+	if err := os.MkdirAll(invDir, 0o750); err != nil {
 		t.Fatal(err)
+	}
+	for id, doc := range testInventory {
+		if err := os.WriteFile(filepath.Join(invDir, id+".yaml"), []byte(doc), 0o640); err != nil {
+			t.Fatal(err)
+		}
 	}
 	recDir := filepath.Join(dir, "recordings")
 	if err := os.MkdirAll(recDir, 0o750); err != nil {
@@ -73,13 +76,14 @@ func newHarness(t *testing.T) *harness {
 
 	log := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	w, err := inventory.NewWatcher(invPath, time.Hour, log)
+	w, err := inventory.NewWatcher(invDir, time.Hour, log)
 	if err != nil {
 		t.Fatalf("inventory.NewWatcher: %v", err)
 	}
+	t.Cleanup(func() { w.Close() })
 
 	cfg := config.Default()
-	cfg.InventoryPath = invPath
+	cfg.InventoryDir = invDir
 	cfg.TranscriptDir = recDir
 	cfg.HostAccess = config.HostFake
 	cfg.LeaseIdle = time.Minute
