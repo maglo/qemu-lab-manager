@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>labview</title>
+<link rel="stylesheet" href="/vendor/xterm/xterm.css">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header id="bar">
+    <button id="back" class="ghost" hidden>&larr; wall</button>
+    <h1 id="title">labview</h1>
+    <div id="bar-machine" hidden>
+      <span id="machine-host" class="muted"></span>
+      <span id="machine-state" class="pill"></span>
+    </div>
+    <div class="spacer"></div>
+    <span id="identity" class="muted" title="asserted by the reverse proxy"></span>
+  </header>
+
+  <!-- The wall: a grid of live, view-only framebuffers. -->
+  <main id="wall" class="view">
+    <div id="tiles" class="tiles"></div>
+    <p id="wall-empty" class="empty" hidden>No machines in the inventory.</p>
+  </main>
+
+  <!-- Expanded: one machine fills the viewport, tabbed. -->
+  <main id="expanded" class="view" hidden>
+    <div id="controls" class="controls">
+      <button id="take" class="primary">Take control</button>
+      <button id="release" class="ghost" hidden>Release control</button>
+      <span id="control-state" class="muted"></span>
+      <div class="spacer"></div>
+      <button id="cad" class="ghost" title="Send Ctrl+Alt+Del">Ctrl+Alt+Del</button>
+      <button id="fullscreen" class="ghost">Full screen</button>
+      <span class="divider"></span>
+      <button id="power-start" class="ghost">Start</button>
+      <button id="power-stop" class="ghost">Stop</button>
+      <button id="power-restart" class="danger">Restart</button>
+    </div>
+
+    <nav id="tabs" class="tabs"></nav>
+
+    <section class="panels">
+      <div class="panel" data-tab="console">
+        <div id="console-host" class="console-host"></div>
+        <p id="console-note" class="note" hidden></p>
+      </div>
+      <div class="panel" data-tab="serial" hidden>
+        <div id="serial-host" class="serial-host"></div>
+        <p id="serial-note" class="note"></p>
+      </div>
+      <div class="panel scroll" data-tab="details" hidden><div id="details"></div></div>
+      <div class="panel scroll" data-tab="logs" hidden><div id="logs" class="logs"></div></div>
+      <div class="panel scroll" data-tab="recordings" hidden><div id="recordings"></div></div>
+      <div class="panel scroll" data-tab="activity" hidden><div id="activity"></div></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- xterm ships a UMD bundle, so it defines window.Terminal here rather
+       than being imported as a module. -->
+  <script src="/vendor/xterm/xterm.js"></script>
+  <script type="module" src="/app/main.js"></script>
+</body>
+</html>

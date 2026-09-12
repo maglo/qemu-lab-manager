@@ -156,7 +156,7 @@ func (s *Subscriber) deliver(ev Event) {
 // UpstreamState describes the broker's connection to QEMU.
 type UpstreamState struct {
 	Connected     bool      `json:"connected"`
-	Since         time.Time `json:"since,omitempty"`
+	Since         time.Time `json:"since,omitzero"`
 	LastError     string    `json:"lastError,omitempty"`
 	Attempts      int       `json:"attempts"`
 	BytesReceived int64     `json:"bytesReceived"`

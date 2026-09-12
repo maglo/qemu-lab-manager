@@ -1,0 +1,348 @@
+/* labview. Dark by default: this is looked at next to a terminal, and a
+   bright page beside a console is unpleasant to work in. */
+:root {
+  --bg: #16181d;
+  --panel: #1d2027;
+  --panel-2: #23272f;
+  --line: #2f343d;
+  --text: #d9dde3;
+  --muted: #8b939f;
+  --accent: #5aa9e6;
+  --good: #5ac18e;
+  --bad: #e0654f;
+  --warn: #d9a95c;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+/* Hidden means hidden. Without !important any later `display` rule with
+   equal specificity wins -- which is how every scrollable tab panel ended up
+   rendering at once, side by side, the first time this was built. */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+body { display: flex; flex-direction: column; }
+
+#bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+#bar h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .02em; }
+#bar-machine { display: flex; align-items: center; gap: 10px; }
+.spacer { flex: 1; }
+.muted { color: var(--muted); font-size: 12px; }
+.divider { width: 1px; height: 20px; background: var(--line); }
+
+.view { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+
+/* --- Wall ------------------------------------------------------------- */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+  padding: 16px;
+  overflow: auto;
+}
+
+.tile {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+.tile:hover { border-color: var(--accent); }
+.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.tile-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+/* The name gets the space it needs and the host yields before it does; a
+   long "why" is truncated with the full text on the tile's tooltip. */
+.tile-name {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.tile-host {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.tile-head .pill {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The screen area keeps a fixed aspect so the grid does not jump as
+   framebuffers report their sizes. */
+.tile-screen {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  min-height: 0;
+}
+.tile-screen > * { position: absolute; inset: 0; }
+
+.tile-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  background: var(--panel-2);
+}
+
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: 0 0 auto;
+}
+.dot.live { background: var(--good); }
+.dot.dead { background: var(--bad); }
+.dot.unknown { background: var(--warn); }
+
+.pill {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pill.held { color: var(--warn); border-color: var(--warn); }
+.pill.mine { color: var(--good); border-color: var(--good); }
+
+/* --- Expanded --------------------------------------------------------- */
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
+
+button {
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 11px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #10131a; font-weight: 600; }
+button.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
+button.ghost { background: transparent; }
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+  overflow-x: auto;
+}
+.tabs button {
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 9px 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+
+.panels { flex: 1 1 auto; min-height: 0; display: flex; }
+.panel { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.panel.scroll { overflow: auto; padding: 16px; display: block; }
+/* A reading width. Tables and command lines stretched across a 4K display
+   are markedly harder to scan than the same content in a column. */
+.panel.scroll > div { max-width: 1100px; }
+
+.console-host, .serial-host { flex: 1 1 auto; min-height: 0; background: #000; position: relative; }
+.console-host > * { width: 100%; height: 100%; }
+
+.note {
+  margin: 0;
+  padding: 6px 16px;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+.note.warn { color: var(--warn); }
+.note.bad { color: var(--bad); }
+
+/* --- Details, logs, recordings, activity ------------------------------ */
+
+.block { margin-bottom: 18px; }
+.block > h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.copywrap { position: relative; }
+.copywrap button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity .1s;
+}
+.copywrap:hover button, .copywrap button:focus-visible { opacity: 1; }
+
+/* Copied text must be plain and unwrapped: a command line copied with its
+   visual wrapping is worse than useless (design section 8). So the element
+   that holds the text scrolls horizontally rather than wrapping. */
+pre.code {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-x: auto;
+  white-space: pre;
+  tab-size: 4;
+}
+pre.code.wrapped { white-space: pre-wrap; word-break: break-word; }
+
+table.kv { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.kv th, table.kv td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+table.kv th { color: var(--muted); font-weight: 500; width: 180px; white-space: nowrap; }
+table.kv td { font-family: var(--mono); font-size: 12px; word-break: break-word; }
+
+.logs { font-family: var(--mono); font-size: 12px; }
+.logline { display: flex; gap: 10px; padding: 1px 0; }
+.logline time { color: var(--muted); flex: 0 0 auto; }
+.logline .msg { white-space: pre-wrap; word-break: break-word; }
+.logline.p3 .msg, .logline.p2 .msg, .logline.p1 .msg, .logline.p0 .msg { color: var(--bad); }
+.logline.p4 .msg { color: var(--warn); }
+
+.rows { display: flex; flex-direction: column; gap: 1px; }
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  background: var(--panel);
+  font-size: 13px;
+}
+.row time { color: var(--muted); font-size: 12px; flex: 0 0 auto; }
+.row .who { font-weight: 600; }
+.row .what { color: var(--muted); }
+
+.warnings { margin: 0 0 14px; padding: 0; list-style: none; }
+.warnings li {
+  font-size: 12px;
+  color: var(--warn);
+  background: rgba(217, 169, 92, .08);
+  border-left: 2px solid var(--warn);
+  padding: 6px 10px;
+  margin-bottom: 4px;
+}
+
+.empty { color: var(--muted); padding: 24px 16px; text-align: center; }
+
+.toast {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 16px;
+  font-size: 13px;
+  z-index: 10;
+  max-width: 80vw;
+}
+.toast.bad { border-color: var(--bad); color: var(--bad); }
+.toast.good { border-color: var(--good); }
+
+@media (max-width: 560px) {
+  .tiles { grid-template-columns: 1fr; padding: 10px; }
+  table.kv th { width: auto; }
+}
+
+/* Hosts for the vendored renderers. */
+.rfb-host, .xterm-host { width: 100%; height: 100%; }
+.tile-screen-slot { position: relative; }
+.tile-screen-slot .tile-screen { position: relative; }
+
+/* The tile's hit target. Transparent, and above the framebuffer. */
+.tile-cover { position: absolute; inset: 0; z-index: 2; background: transparent; }
+.serial-host .xterm-host { padding: 4px; }
+
+.tabs button[role="tab"] { cursor: pointer; }
+
+.copywrap + details { margin-top: 6px; }
+details summary { cursor: pointer; font-size: 12px; padding: 2px 0; }
+
+.row a {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 12px;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.row a:hover { border-color: var(--accent); }

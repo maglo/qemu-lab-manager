@@ -45,7 +45,7 @@ type Unit struct {
 	LoadState   string    `json:"loadState,omitempty"`
 	ActiveState string    `json:"activeState,omitempty"`
 	SubState    string    `json:"subState,omitempty"`
-	Since       time.Time `json:"since,omitempty"`
+	Since       time.Time `json:"since,omitzero"`
 	MainPID     int       `json:"mainPid,omitempty"`
 	Result      string    `json:"result,omitempty"`
 }
