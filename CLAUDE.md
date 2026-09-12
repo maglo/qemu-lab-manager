@@ -40,7 +40,7 @@ the pull request, so a rule that needs an approval blocks every pull request
 of the agent.
 
 The checks are the gate for a merge. The branch protection rules of `main`
-need 0 approvals, and they need the two checks.
+need 0 approvals, and they need the four checks.
 
 ## Issues and labels
 
@@ -84,11 +84,20 @@ before you push.
 ./scripts/check-docs.sh
 ```
 
+`checks.yml` runs two jobs.
+
 - `documents` checks each markdown file. A line has 80 characters or fewer.
   A table line and a line with a URL can be longer. A line does not end with
   a space. A file ends with a newline.
 - `pull request rules` checks the description and the labels. The description
   closes an issue. The pull request has one type label.
+
+`ci.yml` runs two jobs for the Go code.
+
+- `build, vet and test` runs `gofmt`, `go vet`, the build and the tests. The
+  tests run with the race detector.
+- `browser checks` runs labview in a browser against a fake lab. It keeps the
+  screenshots as an artifact.
 
 A human makes the checks necessary for a merge. The setting is in the branch
 protection rules of `main`.
