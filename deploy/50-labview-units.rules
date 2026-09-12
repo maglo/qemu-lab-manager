@@ -1,0 +1,39 @@
+// Let labview manage the lab's VM units, and nothing else on the host.
+//
+// Design section 12: "labview runs as its own user, not root, with a polkit
+// rule granting unit management over just those units." This is that rule.
+//
+// Install to /etc/polkit-1/rules.d/50-labview-units.rules.
+//
+// Two layers have to agree for a power operation to happen at all. labview
+// maps a machine id to a unit through the inventory, so it can only ever ask
+// about units the inventory named; this rule is the host's own opinion about
+// which units that user may touch, so a mistake in the inventory cannot turn
+// into "restart anything on this hypervisor".
+//
+// ADJUST THE PATTERN to match the lab's unit naming before installing. The
+// pattern below assumes VM units are named qemu-<machine>.service.
+
+polkit.addRule(function (action, subject) {
+    if (action.id !== "org.freedesktop.systemd1.manage-units") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (subject.user !== "labview") {
+        return polkit.Result.NOT_HANDLED;
+    }
+
+    var unit = action.lookup("unit");
+    if (!unit || !/^qemu-[A-Za-z0-9._-]+\.service$/.test(unit)) {
+        return polkit.Result.NOT_HANDLED;
+    }
+
+    // labview performs exactly these three. Anything else -- mask, enable,
+    // kill, a unit file change -- is not its business even on a unit it may
+    // otherwise restart.
+    var verb = action.lookup("verb");
+    if (verb === "start" || verb === "stop" || verb === "restart") {
+        return polkit.Result.YES;
+    }
+
+    return polkit.Result.NOT_HANDLED;
+});
