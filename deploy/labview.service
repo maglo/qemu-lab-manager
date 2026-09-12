@@ -1,0 +1,72 @@
+# labview -- a console wall for the QEMU lab.
+#
+# labview runs as its own user, not root (design section 12). It needs three
+# things from the host and nothing else:
+#
+#   - read/write on the QEMU serial sockets, for the brokers
+#   - the system bus, to start, stop and restart units via systemd
+#   - the journal, for the logs tab
+#
+# Install to /etc/systemd/system/labview.service and adjust the paths and
+# the supplementary groups to match the lab.
+
+[Unit]
+Description=labview -- console wall for the QEMU lab
+Documentation=file:/usr/share/doc/labview/labview.md
+After=network-online.target dbus.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+ExecStart=/usr/local/bin/labview \
+    -listen 127.0.0.1:8080 \
+    -inventory /etc/labview/inventory.json \
+    -recordings-dir /var/lib/labview/recordings \
+    -host-access local
+
+User=labview
+Group=labview
+# qemu: to open the chardev sockets QEMU creates.
+# systemd-journal: to read the journal for the logs tab.
+SupplementaryGroups=qemu systemd-journal
+
+Restart=on-failure
+RestartSec=2s
+
+# Brokers hold a socket and a capture file each, one goroutine per machine.
+LimitNOFILE=8192
+
+# Stop politely: SIGTERM makes labview close every transcript before it
+# exits, so a capture is never left unflushed.
+KillSignal=SIGTERM
+TimeoutStopSec=15s
+
+# Hardening. labview reads /proc for QEMU command lines and writes only its
+# recordings directory, so almost everything else can be closed off.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/labview
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+
+# ProcSubset=pid and ProtectProc must stay permissive: reading another
+# process's /proc/<pid>/cmdline is how the details tab gets the QEMU command
+# line, which section 8 calls the most useful thing on the page.
+ProtectProc=default
+ProcSubset=all
+
+[Install]
+WantedBy=multi-user.target
