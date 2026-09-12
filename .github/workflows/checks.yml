@@ -2,12 +2,13 @@ name: checks
 
 on:
   pull_request:
-    types: [opened, edited, reopened, synchronize, labeled, unlabeled]
+    types: [opened, edited, reopened, synchronize]
   push:
     branches: [main]
 
 permissions:
   contents: read
+  issues: read
 
 jobs:
   documents:
@@ -24,3 +25,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: ./scripts/check-pull-request.sh "$GITHUB_EVENT_PATH"
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -4,24 +4,31 @@
 set -eu
 
 event="${1:-$GITHUB_EVENT_PATH}"
-status=0
 
 body=$(jq -r '.pull_request.body // ""' "$event")
-if printf '%s' "$body" | grep -qiE '(close[sd]?|fixe?[sd]?|resolve[sd]?) #[0-9]+'; then
-	echo "linked issue: ok"
-else
+repo=$(jq -r '.repository.full_name' "$event")
+
+issue=$(printf '%s' "$body" |
+	grep -oiE '(close[sd]?|fixe?[sd]?|resolve[sd]?) #[0-9]+' |
+	head -1 | tr -dc '0-9')
+
+if [ -z "$issue" ]; then
 	echo "error: the description has no line that closes an issue"
 	echo "       write 'Closes #<number>' in the description"
-	status=1
+	exit 1
+fi
+echo "linked issue: #$issue"
+
+if ! labels=$(gh issue view "$issue" --repo "$repo" --json labels \
+	--jq '.labels[].name'); then
+	echo "error: the check cannot read issue #$issue"
+	exit 1
 fi
 
-types=$(jq -r '.pull_request.labels[].name' "$event" | grep -c '^type:' || true)
-if [ "$types" -eq 1 ]; then
-	echo "type label: ok"
-else
-	echo "error: the pull request has $types type labels, and it needs 1"
-	echo "       use the type label of the issue"
-	status=1
+types=$(printf '%s\n' "$labels" | grep -c '^type:' || true)
+if [ "$types" -ne 1 ]; then
+	echo "error: issue #$issue has $types type labels, and it needs 1"
+	echo "       put one type label on the issue"
+	exit 1
 fi
-
-exit "$status"
+echo "type label: ok"

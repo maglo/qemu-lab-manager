@@ -12,6 +12,6 @@ Closes #
 ## Checks
 
 - [ ] The pull request has a linked issue.
-- [ ] The pull request has the type label of the issue.
+- [ ] The issue has one type label.
 - [ ] The documents are correct after this change.
 - [ ] The checks pass.
