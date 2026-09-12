@@ -17,8 +17,8 @@ Every change follows these steps.
 3. Make the change. Update the documents in the same branch.
 4. Open a pull request. Write `Closes #<number>` in the description.
 5. Make the checks pass.
-6. A human reviews the pull request.
-7. A human merges the pull request.
+6. The owner reviews the pull request.
+7. The owner merges the pull request.
 
 ## Limits for the agent
 
@@ -29,6 +29,18 @@ Every change follows these steps.
 - Do not close an issue by hand. The merge closes it through the link.
 - File the issue before you open the pull request.
 - Ask the user before you do work that the issue does not name.
+
+## Review and merge
+
+The owner reviews and merges. The owner can also enable auto-merge.
+
+The repository does not need an approving review. The agent opens a pull
+request with the token of the owner. GitHub does not let the author approve
+the pull request, so a rule that needs an approval blocks every pull request
+of the agent.
+
+The checks are the gate for a merge. The branch protection rules of `main`
+need 0 approvals, and they need the two checks.
 
 ## Issues and labels
 
