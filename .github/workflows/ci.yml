@@ -90,3 +90,23 @@ jobs:
           path: ${{ runner.temp }}/shots
           if-no-files-found: warn
           retention-days: 7
+
+  # The ruleset of main names this job, and not the jobs above it. A new job
+  # above needs no change in the ruleset.
+  gate:
+    name: ci passed
+    needs: [check, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: check the results
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "error: a job of this workflow did not pass"
+              exit 1
+            fi
+          done

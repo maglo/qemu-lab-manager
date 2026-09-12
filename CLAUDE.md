@@ -52,7 +52,7 @@ the pull request, so a rule that needs an approval blocks every pull request
 of the agent.
 
 The checks are the gate for a merge. The branch protection rules of `main`
-need 0 approvals, and they need the four checks.
+need 0 approvals, and they need `checks passed` and `ci passed`.
 
 ## Issues and labels
 
@@ -91,18 +91,21 @@ A human creates these labels in the repository settings.
 
 ## Checks
 
-GitHub Actions runs the checks for each pull request. Run the document check
+GitHub Actions runs the checks for each pull request. Run these two checks
 before you push.
 
 ```sh
 ./scripts/check-docs.sh
+./scripts/check-workflows.sh
 ```
 
-`checks.yml` runs two jobs.
+`checks.yml` runs three jobs.
 
 - `documents` checks each markdown file. A line has 80 characters or fewer.
   A table line and a line with a URL can be longer. A line does not end with
   a space. A file ends with a newline.
+- `workflows` checks that the gate job of each workflow depends on every other
+  job of that workflow.
 - `pull request rules` checks the description and the issue. The description
   closes an issue, and that issue has one type label.
 
@@ -113,8 +116,13 @@ before you push.
 - `browser checks` runs labview in a browser against a fake lab. It keeps the
   screenshots as an artifact.
 
-A human makes the checks necessary for a merge. The setting is in the branch
-protection rules of `main`.
+Each workflow ends with a gate job: `checks passed` and `ci passed`. A gate job
+depends on every other job of the workflow, and it fails if one of them does
+not pass. A skipped job and a cancelled job also fail the gate.
+
+The ruleset of `main` names the two gate jobs, and it names no other job. A new
+job therefore needs no change in the ruleset. Add each new job to the `needs`
+list of the gate. The `workflows` check fails if you forget.
 
 ## Documents
 
