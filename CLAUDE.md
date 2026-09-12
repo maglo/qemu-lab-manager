@@ -82,8 +82,10 @@ Priority, optional:
 | `prio:high` | Do this first. |
 | `prio:low` | Do this last. |
 
-An issue without a priority label has normal priority. A pull request gets the
-same type label as its issue.
+An issue without a priority label has normal priority.
+
+A label belongs on the issue. A pull request does not get a label, because the
+issue carries the type.
 
 A human creates these labels in the repository settings.
 
@@ -101,8 +103,8 @@ before you push.
 - `documents` checks each markdown file. A line has 80 characters or fewer.
   A table line and a line with a URL can be longer. A line does not end with
   a space. A file ends with a newline.
-- `pull request rules` checks the description and the labels. The description
-  closes an issue. The pull request has one type label.
+- `pull request rules` checks the description and the issue. The description
+  closes an issue, and that issue has one type label.
 
 `ci.yml` runs two jobs for the Go code.
 
