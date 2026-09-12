@@ -16,12 +16,14 @@ Every change follows these steps.
 2. Make a branch from `main`.
 3. Make the change. Update the documents in the same branch.
 4. Open a pull request. Write `Closes #<number>` in the description.
-5. A human reviews the pull request.
-6. A human merges the pull request.
+5. Make the checks pass.
+6. A human reviews the pull request.
+7. A human merges the pull request.
 
 ## Limits for the agent
 
 - Do not merge a pull request. Only a human merges.
+- Do not change the checks to make a red check pass.
 - Do not push to `main`. Push to a branch and open a pull request.
 - Do not force-push a branch that another person uses.
 - Do not close an issue by hand. The merge closes it through the link.
@@ -60,6 +62,24 @@ An issue without a priority label has normal priority. A pull request gets the
 same type label as its issue.
 
 A human creates these labels in the repository settings.
+
+## Checks
+
+GitHub Actions runs the checks for each pull request. Run the document check
+before you push.
+
+```sh
+./scripts/check-docs.sh
+```
+
+- `documents` checks each markdown file. A line has 80 characters or fewer.
+  A table line and a line with a URL can be longer. A line does not end with
+  a space. A file ends with a newline.
+- `pull request rules` checks the description and the labels. The description
+  closes an issue. The pull request has one type label.
+
+A human makes the checks necessary for a merge. The setting is in the branch
+protection rules of `main`.
 
 ## Documents
 

@@ -14,3 +14,4 @@ Closes #
 - [ ] The pull request has a linked issue.
 - [ ] The pull request has the type label of the issue.
 - [ ] The documents are correct after this change.
+- [ ] The checks pass.
