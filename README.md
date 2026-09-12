@@ -130,7 +130,7 @@ The image sets no listen address, so labview binds loopback as it always
 does and the proxy goes in front of it. On a laptop, with no lab:
 
     podman run --rm --network host \
-        -v ./inventory.json:/etc/labview/inventory.json:ro \
+        -v ./inventory.d:/etc/labview/inventory.d:ro \
         ghcr.io/maglo/qemu-lab-manager/labview:latest \
         -host-access fake
 

@@ -28,7 +28,7 @@ embedded, so there is nothing else to install.
 | Path | Content |
 |---|---|
 | `/usr/local/bin/labview` | The binary, with the UI inside it. |
-| `/etc/labview` | The mount point for the inventory file. |
+| `/etc/labview` | The mount point for the inventory directory. |
 | `/var/lib/labview/recordings` | The recordings directory. |
 | `/etc/passwd` | One account, `labview`, uid 65532. |
 
@@ -82,7 +82,7 @@ lab decides which of them it wants.
 | The serial sockets | The QEMU socket directory, read and write. |
 | Power operations | The system bus socket, plus the polkit rule. |
 | The QEMU command lines | The process namespace of the host. |
-| The inventory | The inventory file, read only. |
+| The inventory | The inventory directory, read only. |
 | The recordings | A writable directory. |
 
 The polkit rule matches a user name. A container user is not a host user, so
