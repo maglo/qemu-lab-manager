@@ -48,7 +48,7 @@ type machineSummary struct {
 // the failure instead.
 type serialState struct {
 	Connected   bool      `json:"connected"`
-	Since       time.Time `json:"since,omitempty"`
+	Since       time.Time `json:"since,omitzero"`
 	Subscribers int       `json:"subscribers"`
 	Scrollback  int64     `json:"scrollbackBytes"`
 	Failing     bool      `json:"failing,omitempty"`
