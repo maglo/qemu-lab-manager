@@ -73,7 +73,7 @@ pids+=($!)
 for name in "labview:$PORT" "proxy:$PROXY_PORT"; do
   label=${name%%:*}; port=${name##*:}
   for _ in $(seq 1 40); do
-    if curl -fsS -o /dev/null "http://127.0.0.1:$port/healthz"; then
+    if curl -fs -o /dev/null "http://127.0.0.1:$port/healthz"; then
       echo "   $label up"; break
     fi
     sleep 0.25
