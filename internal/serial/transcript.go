@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -293,6 +294,30 @@ type Recording struct {
 	ModTime time.Time `json:"modified"`
 }
 
+// recordingName matches what NewTranscript produces: a machine id, a start
+// timestamp, an optional collision counter, and the extension.
+//
+// It is anchored on the timestamp rather than on the id, because an id may
+// contain hyphens. A bare prefix match would let machine "el9" claim
+// "el9-build-<stamp>.cast", which is a realistic pair of names in one lab.
+var recordingName = regexp.MustCompile(`^(.+)-(\d{8}T\d{6}Z)(?:\.\d+)?\.cast$`)
+
+// RecordingBelongsTo reports whether a capture filename is one of machineID's.
+//
+// The name reaches this from a client, so it is parsed rather than trusted:
+// it must be a bare filename of exactly the shape the transcript writer
+// produces, for exactly this machine.
+func RecordingBelongsTo(name, machineID string) bool {
+	if name == "" || len(name) > 256 || machineID == "" {
+		return false
+	}
+	if name != filepath.Base(name) || strings.ContainsAny(name, `/\`) || strings.Contains(name, "..") {
+		return false
+	}
+	m := recordingName.FindStringSubmatch(name)
+	return m != nil && m[1] == machineID
+}
+
 // ListRecordings returns a machine's captures, newest first.
 func ListRecordings(dir, machineID string) ([]Recording, error) {
 	if dir == "" {
@@ -306,10 +331,9 @@ func ListRecordings(dir, machineID string) ([]Recording, error) {
 		return nil, err
 	}
 
-	prefix := machineID + "-"
 	out := []Recording{}
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasPrefix(e.Name(), prefix) || !strings.HasSuffix(e.Name(), ".cast") {
+		if e.IsDir() || !RecordingBelongsTo(e.Name(), machineID) {
 			continue
 		}
 		fi, err := e.Info()
@@ -319,7 +343,7 @@ func ListRecordings(dir, machineID string) ([]Recording, error) {
 		out = append(out, Recording{
 			Name:    e.Name(),
 			Size:    fi.Size(),
-			Started: startTimeFromName(e.Name(), prefix),
+			Started: startTimeFromName(e.Name()),
 			ModTime: fi.ModTime(),
 		})
 	}
@@ -327,13 +351,12 @@ func ListRecordings(dir, machineID string) ([]Recording, error) {
 	return out, nil
 }
 
-func startTimeFromName(name, prefix string) time.Time {
-	stamp := strings.TrimPrefix(name, prefix)
-	stamp = strings.TrimSuffix(stamp, ".cast")
-	if i := strings.IndexByte(stamp, '.'); i >= 0 {
-		stamp = stamp[:i]
+func startTimeFromName(name string) time.Time {
+	m := recordingName.FindStringSubmatch(name)
+	if m == nil {
+		return time.Time{}
 	}
-	ts, err := time.Parse(transcriptTimeFormat, stamp)
+	ts, err := time.Parse(transcriptTimeFormat, m[2])
 	if err != nil {
 		return time.Time{}
 	}

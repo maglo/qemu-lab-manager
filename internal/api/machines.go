@@ -268,7 +268,7 @@ func (s *Server) handleRecording(w http.ResponseWriter, r *http.Request) {
 	// The name comes from a client, so it is validated rather than trusted:
 	// it must be a plain filename belonging to this machine.
 	name := r.PathValue("name")
-	if !validRecordingName(name, m.ID) {
+	if !serial.RecordingBelongsTo(name, m.ID) {
 		writeError(w, http.StatusBadRequest, "not a recording name for machine %q", m.ID)
 		return
 	}
@@ -295,24 +295,6 @@ func (s *Server) handleRecording(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", "attachment; filename="+name)
 	}
 	http.ServeContent(w, r, name, fi.ModTime(), f)
-}
-
-// validRecordingName accepts only a bare filename of the shape the transcript
-// writer produces, for this machine.
-func validRecordingName(name, machineID string) bool {
-	if name == "" || len(name) > 256 {
-		return false
-	}
-	if name != filepath.Base(name) || strings.ContainsAny(name, `/\`) || strings.Contains(name, "..") {
-		return false
-	}
-	if !strings.HasSuffix(name, ".cast") {
-		return false
-	}
-	// Machine ids are validated at load and cannot contain a hyphen-free
-	// ambiguity, so a prefix match is enough to keep one machine's captures
-	// out of another's listing.
-	return strings.HasPrefix(name, machineID+"-")
 }
 
 // handleActivity serves one machine's history.
