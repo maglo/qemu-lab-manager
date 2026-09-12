@@ -479,6 +479,26 @@ func (b *Broker) serve(ctx context.Context, conn net.Conn) {
 		}
 	}()
 
+	// Push the capture to disk while the connection is live, so a run in
+	// progress can be read and a hard kill loses seconds rather than
+	// everything since the machine booted.
+	if tr != nil {
+		go func() {
+			t := time.NewTicker(b.cfg.Transcripts.flushInterval())
+			defer t.Stop()
+			for {
+				select {
+				case <-readDone:
+					return
+				case <-t.C:
+					if err := tr.Flush(); err != nil {
+						b.log.Warn("transcript flush failed", "error", err)
+					}
+				}
+			}
+		}()
+	}
+
 	readErr := b.readLoop(conn, tr)
 	close(readDone)
 
