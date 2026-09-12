@@ -46,8 +46,15 @@ async function onlyPanelVisible(page, tab) {
   // console reports should fail the run, which is how the CSP breakage was
   // caught.
   const expectedError = (text) =>
+    // The fixture's switched-off machine, refused with a 503.
     /ws\/console\/offline-box.*(503|Unexpected response code)/.test(text) ||
-    /Failed when connecting: Connection closed \(code: 1006\)/.test(text);
+    /Failed when connecting: Connection closed \(code: 1006\)/.test(text) ||
+    // Chromium's own WebCodecs bookkeeping, emitted by the screenshot path
+    // on newer builds. Nothing in this application uses VideoFrame -- noVNC
+    // draws to a 2D canvas and xterm to the DOM -- so it cannot be ours.
+    // Listed explicitly rather than loosening the check, which is what
+    // caught the content-security-policy breakage.
+    /A VideoFrame was garbage collected without being closed/.test(text);
 
   const errors = [];
   const expected = [];
