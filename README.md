@@ -102,6 +102,31 @@ fail in ways that look like labview bugs:
   it completely: it is the only thing naming the lease holder and the only
   thing in the audit trail.
 
+### The container image
+
+Each commit on `main` publishes an image to the registry of this repository:
+
+    podman pull ghcr.io/maglo/qemu-lab-manager/labview:latest
+
+It is the binary on `scratch`, about eight megabytes, running as uid 65532.
+The image sets no listen address, so labview binds loopback as it always
+does and the proxy goes in front of it. On a laptop, with no lab:
+
+    podman run --rm --network host \
+        -v ./inventory.json:/etc/labview/inventory.json:ro \
+        ghcr.io/maglo/qemu-lab-manager/labview:latest \
+        -host-access fake
+
+Two things do not work in the container, because the image holds no host
+tools: the logs tab needs `journalctl`, and the disk sizes on the details
+tab need `qemu-img`. Both say what is missing. Everything else works, and
+on a hypervisor the container also needs the QEMU socket directory, the
+system bus and the process namespace of the host.
+
+The systemd unit above is still the full deployment.
+[`docs/design/container.md`](docs/design/container.md) gives the reasons and
+lists the mounts.
+
 ### The API
 
 Everything the UI shows is also JSON. The UI is one consumer, a test harness
@@ -187,4 +212,6 @@ forwards raw bytes and lets the browser decode incrementally.
     internal/activity/     who did what
     deploy/                unit file, polkit rule, proxy configuration
     test/lab/              a fake QEMU lab, and browser-driven checks
-    .github/workflows/     CI: build, vet, race tests, browser checks
+    Dockerfile             the container image
+    .github/workflows/     CI: build, vet, race tests, browser checks,
+                           and the image
