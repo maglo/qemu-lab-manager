@@ -1,0 +1,34 @@
+[
+  {
+    "id": "el9-build",
+    "name": "el9-build",
+    "host": "kvm01",
+    "vnc": "127.0.0.1:15901",
+    "serial": "/tmp/labview-lab/el9-build.sock",
+    "unit": "qemu-el9-build.service",
+    "notes": "AlmaLinux 9 build box"
+  },
+  {
+    "id": "el9-serial-only",
+    "name": "el9-serial-only",
+    "host": "kvm01",
+    "serial": "/tmp/labview-lab/serial-only.sock",
+    "unit": "qemu-serial-only.service",
+    "notes": "No framebuffer worth showing"
+  },
+  {
+    "id": "offline-box",
+    "name": "offline-box",
+    "host": "kvm02",
+    "vnc": "127.0.0.1:15999",
+    "serial": "/tmp/labview-lab/absent.sock",
+    "unit": "qemu-offline.service",
+    "notes": "Switched off, so you can wait for its boot"
+  },
+  {
+    "id": "no-console",
+    "name": "no-console",
+    "host": "kvm02",
+    "notes": "Neither channel in the inventory"
+  }
+]

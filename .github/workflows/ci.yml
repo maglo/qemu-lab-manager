@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Read-only: nothing here needs to write to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  # A new push supersedes an in-flight run for the same ref.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: build, vet and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          # Single source of truth for the toolchain version.
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt'd:"
+            echo "$unformatted"
+            gofmt -d $unformatted
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: build
+        run: go build ./...
+
+      # -race because the broker fans one upstream connection out to many
+      # subscribers under a single lock, and a regression there is a data
+      # race long before it is a visible bug. -count=1 defeats the cache so
+      # a green run means the tests actually ran.
+      - name: test
+        run: go test -race -count=1 ./...
+
+  e2e:
+    name: browser checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: install playwright
+        working-directory: test/lab
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      # Drives labview in a real browser against a fake lab: a minimal RFB
+      # server, unix sockets printing a boot, and a proxy asserting an
+      # identity. See test/lab/README.md for why unit tests do not cover this.
+      - name: run
+        env:
+          NODE_PATH: ${{ github.workspace }}/test/lab/node_modules
+          SHOTS_DIR: ${{ runner.temp }}/shots
+        run: test/lab/run.sh
+
+      # The screenshots are the point when something fails: a layout bug is
+      # far quicker to read from an image than from an assertion message.
+      - name: upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-screenshots
+          path: ${{ runner.temp }}/shots
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,0 +1,11 @@
+{
+  "name": "labview-lab",
+  "private": true,
+  "description": "Browser-driven checks for labview. See README.md.",
+  "scripts": {
+    "drive": "node drive.js"
+  },
+  "dependencies": {
+    "playwright": "1.63.0"
+  }
+}

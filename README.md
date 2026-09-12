@@ -16,7 +16,18 @@ Nothing but a Go toolchain. The browser application, noVNC and xterm are all
 embedded in the binary.
 
     go build -o labview ./cmd/labview
-    go test ./...
+    go test -race ./...
+
+There is a second layer of checks that drives labview in a real browser
+against a fake lab -- a minimal RFB server, unix sockets printing a boot, and
+a proxy asserting an identity:
+
+    test/lab/run.sh
+
+It needs Node and Python in addition to Go. Unit tests cannot reach the place
+where labview meets a browser, and that is where several of the more
+interesting bugs were; see `test/lab/README.md`. Both layers run in CI on
+every pull request.
 
 ### Run
 
@@ -173,3 +184,5 @@ forwards raw bytes and lets the browser decode incrementally.
     internal/web/          the browser application, embedded
     internal/activity/     who did what
     deploy/                unit file, polkit rule, proxy configuration
+    test/lab/              a fake QEMU lab, and browser-driven checks
+    .github/workflows/     CI: build, vet, race tests, browser checks
