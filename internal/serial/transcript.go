@@ -30,6 +30,23 @@ type TranscriptPolicy struct {
 	// and marks the file truncated rather than starting a second file for
 	// the same run.
 	MaxFileBytes int64
+
+	// FlushInterval bounds how long output may sit in the writer's buffer
+	// before reaching the disk. A capture has to be readable while the
+	// machine is still running, because reading a run that went wrong
+	// usually happens while it is still going.
+	FlushInterval time.Duration
+}
+
+// DefaultFlushInterval is how often an open capture is pushed to disk.
+const DefaultFlushInterval = 2 * time.Second
+
+// Flush interval, with the default applied.
+func (p TranscriptPolicy) flushInterval() time.Duration {
+	if p.FlushInterval <= 0 {
+		return DefaultFlushInterval
+	}
+	return p.FlushInterval
 }
 
 // Enabled reports whether captures should be written at all.
@@ -131,6 +148,14 @@ func NewTranscript(machineID, title string, policy TranscriptPolicy, now time.Ti
 		return nil, err
 	}
 	t.written = int64(len(line)) + 1
+
+	// Flush the header at once, so the file is valid asciicast from the
+	// moment it exists rather than a zero byte file until the first 32KB of
+	// output or the connection dropping.
+	if err := t.w.Flush(); err != nil {
+		f.Close()
+		return nil, err
+	}
 	return t, nil
 }
 

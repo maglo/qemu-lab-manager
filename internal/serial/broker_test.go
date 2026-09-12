@@ -623,3 +623,61 @@ func waitFor(t *testing.T, d time.Duration, cond func() bool) {
 func discardLogger() *slogLogger { return newDiscardLogger() }
 
 var _ io.Writer = io.Discard
+
+// End to end: a machine that is running right now must have a readable
+// capture on disk. This is the path that matters -- the recordings tab lists
+// and plays the file while the VM is still up.
+func TestBrokerCaptureIsReadableWhileMachineRuns(t *testing.T) {
+	q := newFakeQEMU(t)
+	castDir := t.TempDir()
+
+	cfg := testConfig(q)
+	cfg.Transcripts = TranscriptPolicy{Dir: castDir, FlushInterval: 50 * time.Millisecond}
+	b := NewBroker(cfg)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go b.Run(ctx)
+
+	if !q.waitAccepted(2 * time.Second) {
+		t.Fatal("broker never connected")
+	}
+
+	// The file exists and is valid asciicast before any output arrives.
+	waitFor(t, 2*time.Second, func() bool { return b.State().Transcript != "" })
+	path := b.State().Transcript
+	if path == "" {
+		t.Fatal("no capture for a connected machine")
+	}
+	waitFor(t, 2*time.Second, func() bool {
+		fi, err := os.Stat(path)
+		return err == nil && fi.Size() > 0
+	})
+	if fi, err := os.Stat(path); err != nil || fi.Size() == 0 {
+		t.Fatalf("capture is empty on disk while the machine runs (err %v)", err)
+	}
+
+	q.send("[    0.000000] Linux version 6.1\r\n")
+
+	// And the output reaches the disk without the connection dropping.
+	waitFor(t, 3*time.Second, func() bool {
+		data, err := os.ReadFile(path)
+		return err == nil && bytes.Contains(data, []byte("Linux version"))
+	})
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read capture: %v", err)
+	}
+	if !bytes.Contains(data, []byte("Linux version")) {
+		t.Fatalf("output never reached the disk: %q", data)
+	}
+
+	// The listing sees it too, which is what the recordings tab shows.
+	recs, err := ListRecordings(castDir, "el9-build")
+	if err != nil || len(recs) != 1 {
+		t.Fatalf("ListRecordings = %+v, err %v", recs, err)
+	}
+	if recs[0].Size == 0 {
+		t.Error("recordings tab would show a zero byte capture for a running machine")
+	}
+}

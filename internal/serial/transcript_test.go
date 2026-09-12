@@ -364,3 +364,47 @@ func TestRecordingBelongsTo(t *testing.T) {
 		}
 	}
 }
+
+// A capture must be readable while the machine is still running.
+//
+// The recordings tab lists captures and offers to play them, and the whole
+// point of a transcript is reading a run that went wrong -- often while it is
+// still going. A buffered writer that only reaches the disk when the
+// connection drops leaves the current run as a zero byte file.
+func TestTranscriptIsReadableWhileStillOpen(t *testing.T) {
+	dir := t.TempDir()
+	start := time.Now()
+
+	tr, err := NewTranscript("m", "m serial", TranscriptPolicy{Dir: dir}, start)
+	if err != nil {
+		t.Fatalf("NewTranscript: %v", err)
+	}
+	defer tr.Close(time.Now())
+
+	// The header alone must make the file valid asciicast, from the moment
+	// it exists -- before any output at all.
+	if fi, err := os.Stat(tr.Path()); err != nil || fi.Size() == 0 {
+		t.Fatalf("new capture is empty on disk (size %v, err %v)", sizeOf(fi), err)
+	}
+	hdr, _ := readEvents(t, tr.Path())
+	if hdr.Version != 2 {
+		t.Fatalf("header not on disk: %+v", hdr)
+	}
+
+	tr.Write([]byte("booting\r\n"), start.Add(100*time.Millisecond))
+	if err := tr.Flush(); err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+
+	_, events := readEvents(t, tr.Path())
+	if len(events) != 1 || events[0] != "booting\r\n" {
+		t.Fatalf("output not readable while open: %q", events)
+	}
+}
+
+func sizeOf(fi os.FileInfo) any {
+	if fi == nil {
+		return "nil"
+	}
+	return fi.Size()
+}
