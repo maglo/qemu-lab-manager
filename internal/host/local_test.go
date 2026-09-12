@@ -11,13 +11,13 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/inventory"
 )
 
-func machine(t *testing.T, doc string) inventory.Machine {
+func machine(t *testing.T, id, doc string) inventory.Machine {
 	t.Helper()
-	set, err := inventory.Parse([]byte("[" + doc + "]"))
+	m, err := inventory.ParseMachine(id, []byte(doc))
 	if err != nil {
-		t.Fatalf("inventory.Parse: %v", err)
+		t.Fatalf("inventory.ParseMachine: %v", err)
 	}
-	return set.Machines()[0]
+	return m
 }
 
 // The command line comes from /proc as NUL separated argv, which is what
@@ -129,7 +129,7 @@ func TestEnrichNICsSurvivesMissingARPFile(t *testing.T) {
 // and the details page should say so rather than look broken.
 func TestInspectWithoutUnitExplainsItself(t *testing.T) {
 	l := NewLocal(LocalOptions{ProcRoot: t.TempDir(), ArpFile: "/nope", Log: discardLogger()})
-	m := machine(t, `{"id":"m","vnc":"10.0.0.1:5901"}`)
+	m := machine(t, "m", "vnc: 10.0.0.1:5901\n")
 
 	d, err := l.Inspect(context.Background(), m)
 	if err != nil {
@@ -149,7 +149,7 @@ func TestInspectWithoutUnitExplainsItself(t *testing.T) {
 
 func TestUnitStateAndPowerRefuseWithoutUnit(t *testing.T) {
 	l := NewLocal(LocalOptions{Log: discardLogger()})
-	m := machine(t, `{"id":"m","vnc":"10.0.0.1:5901"}`)
+	m := machine(t, "m", "vnc: 10.0.0.1:5901\n")
 
 	var noUnit *ErrNoUnit
 	if _, err := l.UnitState(context.Background(), m); !asErrNoUnit(err, &noUnit) {
@@ -167,7 +167,7 @@ func TestUnitStateAndPowerRefuseWithoutUnit(t *testing.T) {
 
 func TestPowerRejectsUnknownOperation(t *testing.T) {
 	l := NewLocal(LocalOptions{Log: discardLogger()})
-	m := machine(t, `{"id":"m","unit":"qemu-m.service"}`)
+	m := machine(t, "m", "unit: qemu-m.service\n")
 	err := l.Power(context.Background(), m, Op("poweroff-and-delete"))
 	if err == nil {
 		t.Fatal("an unknown operation was accepted")

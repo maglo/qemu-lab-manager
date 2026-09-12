@@ -30,7 +30,7 @@ func TestBindParsesFlags(t *testing.T) {
 
 	err := fs.Parse([]string{
 		"-listen", "127.0.0.1:9999",
-		"-inventory", "/tmp/inv.json",
+		"-inventory", "/etc/labview/machines",
 		"-lease-idle", "90s",
 		"-scrollback-bytes", "1024",
 		"-tile-mode", "screenshot",
@@ -41,7 +41,7 @@ func TestBindParsesFlags(t *testing.T) {
 		t.Fatalf("Parse: %v", err)
 	}
 
-	if c.Listen != "127.0.0.1:9999" || c.InventoryPath != "/tmp/inv.json" {
+	if c.Listen != "127.0.0.1:9999" || c.InventoryDir != "/etc/labview/machines" {
 		t.Errorf("config = %+v", c)
 	}
 	if c.LeaseIdle != 90*time.Second {
@@ -76,7 +76,7 @@ func TestBindRejectsUnknownEnums(t *testing.T) {
 func TestValidateCatchesBadCombinations(t *testing.T) {
 	cases := map[string]func(*Config){
 		"no listen address":      func(c *Config) { c.Listen = "" },
-		"no inventory":           func(c *Config) { c.InventoryPath = "" },
+		"no inventory":           func(c *Config) { c.InventoryDir = "" },
 		"no identity header":     func(c *Config) { c.IdentityHeader = "" },
 		"no default identity":    func(c *Config) { c.DefaultIdentity = "" },
 		"zero lease":             func(c *Config) { c.LeaseIdle = 0 },

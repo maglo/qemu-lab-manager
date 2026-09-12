@@ -1,7 +1,7 @@
 // Package config holds labview's settings.
 //
 // Everything is a flag with a sensible default, because labview is one binary
-// with one inventory file and no database (design, preamble) -- adding a
+// with one inventory directory and no database (design, preamble) -- adding a
 // config file format would be a third interface to maintain alongside the
 // inventory and the API.
 package config
@@ -48,8 +48,9 @@ type Config struct {
 	// proxy terminates TLS and does SSO in front (design section 10).
 	Listen string
 
-	InventoryPath string
-	InventoryPoll time.Duration
+	// InventoryDir holds one YAML file per machine.
+	InventoryDir    string
+	InventoryRescan time.Duration
 
 	// IdentityHeader carries the identity the proxy asserted. It names the
 	// lease holder in the UI and says who attached to what in the log. It
@@ -92,8 +93,8 @@ type Config struct {
 func Default() Config {
 	return Config{
 		Listen:          "127.0.0.1:8080",
-		InventoryPath:   "/etc/labview/inventory.json",
-		InventoryPoll:   2 * time.Second,
+		InventoryDir:    "/etc/labview/inventory.d",
+		InventoryRescan: 2 * time.Second,
 		IdentityHeader:  "X-Forwarded-User",
 		DefaultIdentity: "unidentified",
 
@@ -128,10 +129,10 @@ func Default() Config {
 func Bind(fs *flag.FlagSet, c *Config) {
 	fs.StringVar(&c.Listen, "listen", c.Listen,
 		"address to serve on; loopback by default, with TLS and SSO in a proxy in front")
-	fs.StringVar(&c.InventoryPath, "inventory", c.InventoryPath,
-		"path to the inventory JSON file, re-read when its mtime changes")
-	fs.DurationVar(&c.InventoryPoll, "inventory-poll", c.InventoryPoll,
-		"how often to check the inventory file for changes")
+	fs.StringVar(&c.InventoryDir, "inventory", c.InventoryDir,
+		"directory holding one YAML file per machine, watched for changes")
+	fs.DurationVar(&c.InventoryRescan, "inventory-rescan", c.InventoryRescan,
+		"how often to read the inventory directory again, as a backstop to the watch")
 
 	fs.StringVar(&c.IdentityHeader, "identity-header", c.IdentityHeader,
 		"request header carrying the identity asserted by the proxy")
@@ -187,8 +188,8 @@ func (c Config) Validate() error {
 	if c.Listen == "" {
 		errs = append(errs, errors.New("listen address is required"))
 	}
-	if c.InventoryPath == "" {
-		errs = append(errs, errors.New("inventory path is required"))
+	if c.InventoryDir == "" {
+		errs = append(errs, errors.New("inventory directory is required"))
 	}
 	if c.IdentityHeader == "" {
 		errs = append(errs, errors.New("identity header name is required"))

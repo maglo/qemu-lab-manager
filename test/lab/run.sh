@@ -15,9 +15,9 @@ set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 root=$(cd "$here/../.." && pwd)
 
-# These two are baked into inventory.json, so they are constants rather than
-# knobs: overriding one without editing the fixture would just produce a lab
-# whose machines point at nothing.
+# These two are baked into the machine files, so they are constants rather
+# than knobs: overriding one without editing the fixture would just produce a
+# lab whose machines point at nothing.
 LAB_DIR=/tmp/labview-lab
 VNC_PORT=15901
 
@@ -56,10 +56,15 @@ python3 "$here/fakeserial.py" "$LAB_DIR/serial-only.sock" >"$work/serial2.log" 2
 pids+=($!)
 sleep 1
 
+# The fixture is copied, because the driver adds a machine file and deletes
+# it again to check that labview follows the directory.
+export INVENTORY_DIR=$work/inventory.d
+cp -r "$here/machines" "$INVENTORY_DIR"
+
 echo "== starting labview on 127.0.0.1:$PORT"
 "$work/labview" \
   -listen "127.0.0.1:$PORT" \
-  -inventory "$here/inventory.json" \
+  -inventory "$INVENTORY_DIR" \
   -host-access fake \
   -recordings-dir "$work/recordings" \
   >"$work/labview.log" 2>&1 &

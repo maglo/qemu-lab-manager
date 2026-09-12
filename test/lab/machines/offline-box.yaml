@@ -1,0 +1,6 @@
+name: offline-box
+host: kvm02
+vnc: 127.0.0.1:15999
+serial: /tmp/labview-lab/absent.sock
+unit: qemu-offline.service
+notes: Switched off, so you can wait for its boot

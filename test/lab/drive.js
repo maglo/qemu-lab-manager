@@ -24,6 +24,16 @@ async function onlyPanelVisible(page, tab) {
     `only the ${tab} panel is visible (visible: ${visible.join(',') || 'none'})`);
 }
 
+// tileCount waits for the wall to settle on a number of tiles. The wall
+// polls, so a change in the inventory directory needs one poll to show.
+async function tileCount(page, want) {
+  for (let i = 0; i < 40; i++) {
+    if ((await page.$$('.tile')).length === want) return true;
+    await page.waitForTimeout(500);
+  }
+  return false;
+}
+
 (async () => {
   // CHROMIUM_PATH lets a sandbox with a pre-installed browser skip the
   // download; unset, Playwright uses whatever it installed itself.
@@ -206,6 +216,17 @@ async function onlyPanelVisible(page, tab) {
   check(await page.isVisible('#wall'), 'back returns to the wall');
   check((await page.$$('.tile canvas')).length >= 1, 'the framebuffer session went back to its tile');
   await page.screenshot({ path: `${OUT}/10-wall-after.png` });
+
+  // --- a machine file appears and goes, with labview left running ---
+  const invDir = process.env.INVENTORY_DIR;
+  const newFile = invDir + '/late-arrival.yaml';
+  fs.writeFileSync(newFile, 'name: late-arrival\nhost: kvm03\nnotes: Written while labview runs\n');
+  const arrived = await tileCount(page, 5);
+  check(arrived, 'a new machine file reaches the wall without a restart');
+  await page.screenshot({ path: `${OUT}/11-wall-new-machine.png` });
+
+  fs.unlinkSync(newFile);
+  check(await tileCount(page, 4), 'a deleted machine file leaves the wall');
 
   console.log(`\n--- console errors (${expected.length} expected, ignored) ---`);
   if (errors.length === 0) console.log('(none unexpected)');

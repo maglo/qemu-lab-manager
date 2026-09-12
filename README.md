@@ -4,7 +4,7 @@
 
 A console wall for the QEMU lab. Developers see every machine at a glance,
 open one to drive it, and attach to serial when a scenario needs it. One Go
-binary, one inventory file, no database.
+binary, one inventory directory, no database.
 
 The design is [`docs/design/labview.md`](docs/design/labview.md) and it is
 the authority on why things are the way they are. This file is how to build
@@ -31,7 +31,7 @@ every pull request.
 
 ### Run
 
-    ./labview -inventory ./inventory.json -host-access local
+    ./labview -inventory /etc/labview/inventory.d -host-access local
 
     ./labview -help            # every setting, with its default
 
@@ -42,27 +42,44 @@ than one saying it cannot reach the host.
 
 ### The inventory
 
-Written by something else -- a playbook, a script, a person with an editor
--- and re-read whenever its mtime changes. A malformed file is logged and
-ignored, leaving the previous inventory live.
+A directory. One machine is one YAML file in it, and the file name is the
+machine id:
 
-```json
-[
-  {
-    "id": "el9-build",
-    "name": "el9-build",
-    "host": "kvm01",
-    "vnc": "10.20.0.11:5901",
-    "serial": "/run/qemu/el9-build-serial.sock",
-    "unit": "qemu-el9-build.service",
-    "notes": "AlmaLinux 9"
-  }
-]
+    /etc/labview/inventory.d/
+      el9-build.yaml
+      el9-test.yaml
+      win2022.yaml
+
+```yaml
+# el9-build.yaml
+name: el9-build
+host: kvm01
+vnc: 10.20.0.11:5901
+serial: /run/qemu/el9-build-serial.sock
+unit: qemu-el9-build.service
+notes: AlmaLinux 9
 ```
 
-`id` is the only name a client ever uses, and it becomes a path element and
-a capture filename, so it is validated at load: letters, digits, dot,
-underscore and hyphen, starting with a letter or digit.
+The files are written by something else -- a playbook, a script, a person
+with an editor. labview watches the directory, so a new file, a changed file
+and a deleted file reach the wall at once. It also reads the directory again
+every `-inventory-rescan`, as a backstop for a watch the filesystem does not
+deliver.
+
+A file that does not load is logged and keeps the entry that last loaded, so
+a typo takes down one machine at most and a half-written file takes down
+nothing. `/healthz` names the files that did not load. The first load is
+strict: labview does not start with a file it cannot read, because a wall
+that is quietly missing a machine is worse than one that does not come up.
+
+`.yaml` and `.yml` both count. Anything else in the directory is ignored: a
+README, an editor's backup, a dot file a writer has not finished with.
+
+The file name is the id, and nothing else is. It becomes a path element and a
+capture filename, so it is validated at load: letters, digits, dot,
+underscore and hyphen, starting with a letter or digit. A file that sets `id`
+itself is rejected, because the name on disk and the name in the API must not
+drift apart.
 
 `serial` is a unix socket path when labview runs on the hypervisor, or
 `host:port` when it does not. Either is a dial.
@@ -73,8 +90,8 @@ and labview will not guess a unit name from an id. It is the one field the
 design's own example omits -- section 6 does not list it, but section 12
 requires the inventory to be the id-to-unit mapping.
 
-Unknown fields are kept and shown verbatim on the details tab, so a producer
-newer than labview does not break the load.
+Unknown settings are kept and shown verbatim on the details tab, so a
+producer newer than labview does not break the load.
 
 ### Deploying
 
@@ -175,7 +192,7 @@ forwards raw bytes and lets the browser decode incrementally.
 ### Layout
 
     cmd/labview/           the command
-    internal/inventory/    the machine list, and reloading it
+    internal/inventory/    the machine files, and following them
     internal/serial/       the broker: ring buffer, fan-out, transcripts
     internal/lease/        the write lease
     internal/host/         the hypervisor: systemd, /proc, journal

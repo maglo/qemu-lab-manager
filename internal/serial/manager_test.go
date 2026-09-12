@@ -3,17 +3,26 @@ package serial
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/maglo/qemu-lab-manager/labview/internal/inventory"
 )
 
-func mustSet(t *testing.T, doc string) *inventory.Set {
+// mustSet writes one file per machine and loads the directory, which is the
+// path the service itself takes.
+func mustSet(t *testing.T, files map[string]string) *inventory.Set {
 	t.Helper()
-	set, err := inventory.Parse([]byte(doc))
+	dir := t.TempDir()
+	for id, doc := range files {
+		if err := writeFile(filepath.Join(dir, id+".yaml"), doc); err != nil {
+			t.Fatal(err)
+		}
+	}
+	set, err := inventory.LoadDir(dir)
 	if err != nil {
-		t.Fatalf("inventory.Parse: %v", err)
+		t.Fatalf("inventory.LoadDir: %v", err)
 	}
 	return set
 }
@@ -32,11 +41,11 @@ func TestManagerStartsBrokerPerSerialMachine(t *testing.T) {
 	m := NewManager(ctx, testManagerConfig())
 	defer m.Close()
 
-	m.Reconcile(mustSet(t, `[
-	  {"id":"a","serial":"/run/a.sock"},
-	  {"id":"b","serial":"10.0.0.1:4001"},
-	  {"id":"no-serial","vnc":"10.0.0.1:5901"}
-	]`))
+	m.Reconcile(mustSet(t, map[string]string{
+		"a":         "serial: /run/a.sock\n",
+		"b":         "serial: 10.0.0.1:4001\n",
+		"no-serial": "vnc: 10.0.0.1:5901\n",
+	}))
 
 	if _, ok := m.Get("a"); !ok {
 		t.Error("no broker for machine a")
@@ -67,13 +76,13 @@ func TestManagerStopsBrokerWhenMachineLeaves(t *testing.T) {
 	m := NewManager(ctx, testManagerConfig())
 	defer m.Close()
 
-	m.Reconcile(mustSet(t, `[{"id":"a","serial":"/run/a.sock"}]`))
+	m.Reconcile(mustSet(t, map[string]string{"a": "serial: /run/a.sock\n"}))
 	b, ok := m.Get("a")
 	if !ok {
 		t.Fatal("no broker for a")
 	}
 
-	m.Reconcile(mustSet(t, `[]`))
+	m.Reconcile(mustSet(t, nil))
 	if _, ok := m.Get("a"); ok {
 		t.Fatal("broker survived removal from the inventory")
 	}
@@ -94,10 +103,10 @@ func TestManagerReplacesBrokerWhenAddressChanges(t *testing.T) {
 	m := NewManager(ctx, testManagerConfig())
 	defer m.Close()
 
-	m.Reconcile(mustSet(t, `[{"id":"a","serial":"/run/old.sock"}]`))
+	m.Reconcile(mustSet(t, map[string]string{"a": "serial: /run/old.sock\n"}))
 	before, _ := m.Get("a")
 
-	m.Reconcile(mustSet(t, `[{"id":"a","serial":"/run/new.sock"}]`))
+	m.Reconcile(mustSet(t, map[string]string{"a": "serial: /run/new.sock\n"}))
 	after, ok := m.Get("a")
 	if !ok {
 		t.Fatal("broker vanished on address change")
@@ -119,15 +128,14 @@ func TestManagerKeepsBrokerAcrossUnrelatedReload(t *testing.T) {
 	m := NewManager(ctx, testManagerConfig())
 	defer m.Close()
 
-	doc := `[{"id":"a","serial":"/run/a.sock"}]`
-	m.Reconcile(mustSet(t, doc))
+	m.Reconcile(mustSet(t, map[string]string{"a": "serial: /run/a.sock\n"}))
 	before, _ := m.Get("a")
 
 	// Same machine, plus a new one.
-	m.Reconcile(mustSet(t, `[
-	  {"id":"a","serial":"/run/a.sock"},
-	  {"id":"b","serial":"/run/b.sock"}
-	]`))
+	m.Reconcile(mustSet(t, map[string]string{
+		"a": "serial: /run/a.sock\n",
+		"b": "serial: /run/b.sock\n",
+	}))
 
 	after, _ := m.Get("a")
 	if after != before {
@@ -145,10 +153,10 @@ func TestManagerStatesReportLiveness(t *testing.T) {
 	m := NewManager(ctx, testManagerConfig())
 	defer m.Close()
 
-	m.Reconcile(mustSet(t, fmt.Sprintf(`[
-	  {"id":"live","serial":%q},
-	  {"id":"dead","serial":"/run/nonexistent-labview-test.sock"}
-	]`, q.path)))
+	m.Reconcile(mustSet(t, map[string]string{
+		"live": fmt.Sprintf("serial: %s\n", q.path),
+		"dead": "serial: /run/nonexistent-labview-test.sock\n",
+	}))
 
 	waitFor(t, 3*time.Second, func() bool { return m.States()["live"].Connected })
 
@@ -168,16 +176,15 @@ func TestManagerStatesReportLiveness(t *testing.T) {
 
 func TestManagerRunFollowsInventoryReload(t *testing.T) {
 	dir := t.TempDir()
-	path := dir + "/inventory.json"
-	write := func(doc string) {
+	write := func(id, doc string) {
 		t.Helper()
-		if err := writeFile(path, doc); err != nil {
+		if err := writeFile(filepath.Join(dir, id+".yaml"), doc); err != nil {
 			t.Fatal(err)
 		}
 	}
-	write(`[{"id":"a","serial":"/run/a.sock"}]`)
+	write("a", "serial: /run/a.sock\n")
 
-	w, err := inventory.NewWatcher(path, 20*time.Millisecond, newDiscardLogger())
+	w, err := inventory.NewWatcher(dir, time.Hour, newDiscardLogger())
 	if err != nil {
 		t.Fatalf("NewWatcher: %v", err)
 	}
@@ -194,9 +201,8 @@ func TestManagerRunFollowsInventoryReload(t *testing.T) {
 		t.Fatal("broker for a never started")
 	}
 
-	// The playbook rewrites the file, adding a machine.
-	time.Sleep(30 * time.Millisecond) // ensure a distinct mtime
-	write(`[{"id":"a","serial":"/run/a.sock"},{"id":"c","serial":"/run/c.sock"}]`)
+	// The playbook adds a machine, which is one new file.
+	write("c", "serial: /run/c.sock\n")
 
 	waitFor(t, 3*time.Second, func() bool { _, ok := m.Get("c"); return ok })
 	if _, ok := m.Get("c"); !ok {

@@ -2,7 +2,7 @@
 
 A console wall for the QEMU lab. Developers see every machine at a glance,
 open one to drive it, and attach to serial when a scenario needs it. One Go
-binary, one inventory file, no database.
+binary, one inventory directory, no database.
 
 Status: design only. Implementation happens elsewhere.
 
@@ -127,21 +127,31 @@ into a small client package rather than into the protocol.
 
 ## 6. Inventory
 
-Written by the playbook, read by labview on mtime change. Extends the
-existing shape with a serial address:
+A directory. One machine is one YAML file in it, and the file name is the
+machine `id`:
 
-```json
-[
-  {
-    "id": "el9-build",
-    "name": "el9-build",
-    "host": "kvm01",
-    "vnc": "10.20.0.11:5901",
-    "serial": "/run/qemu/el9-build-serial.sock",
-    "notes": "AlmaLinux 9"
-  }
-]
+```yaml
+# /etc/labview/inventory.d/el9-build.yaml
+name: el9-build
+host: kvm01
+vnc: 10.20.0.11:5901
+serial: /run/qemu/el9-build-serial.sock
+notes: AlmaLinux 9
 ```
+
+One file per machine is what makes the inventory editable. A person changes
+one machine by opening one short file, a playbook writes one file per
+machine with no read-modify-write, and a diff of a change names the machine
+in the path. The file name is the only source of the `id`, so two machines
+cannot claim one id, and a file must not set `id` itself.
+
+labview watches the directory. A new file, a changed file and a deleted file
+all reach the wall at once. A periodic scan runs as well, because a watch
+can be lost.
+
+The unit of failure is the file. A file that does not parse keeps the entry
+that last parsed, and the other machines are untouched. A typo takes down
+one machine at most, and a half-written file takes down nothing.
 
 `serial` is a unix socket path when labview runs on the hypervisor, or
 `host:port` when it doesn't. Either is a `net.Dial`, so the broker does not
@@ -351,9 +361,9 @@ deployment question to answer later, and the design stays usable either way.
 
 Three interfaces, and they are the whole contract:
 
-**Inventory in.** A JSON file in the shape of §6. labview re-reads it when
-the mtime changes. Any producer will do — a playbook, a script, a person
-with an editor.
+**Inventory in.** A directory of YAML files in the shape of §6, one for each
+machine. labview watches the directory and follows what it finds. Any
+producer will do — a playbook, a script, a person with an editor.
 
 **Host access out.** An internal interface, because the channels split two
 ways. Framebuffer and serial are dialable over the network. The QEMU command

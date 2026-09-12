@@ -80,7 +80,8 @@ func (m *Manager) Get(id string) (*Broker, bool) {
 // replacing one whose serial address changed.
 //
 // It is called once at startup and again after every successful inventory
-// reload, which is what makes the inventory file the live source of truth.
+// reload, which is what makes the inventory directory the live source of
+// truth.
 func (m *Manager) Reconcile(set *inventory.Set) {
 	m.mu.Lock()
 	if m.closed {
