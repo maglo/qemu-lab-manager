@@ -1,0 +1,19 @@
+---
+major_changes:
+  - "labview - show every machine of the lab on one wall. A tile gives the
+    name, the liveness and the holder of the write lease. Open a machine to
+    reach its console, its serial line, its journal, its details, its
+    recordings and its activity."
+  - "inventory - read one YAML file for each machine from a directory, and
+    take the file name as the id of the machine. labview watches the
+    directory, so a new file, a changed file and a deleted file reach the
+    wall at once, and it reads the directory again every `-inventory-rescan`
+    as a backstop
+    (https://github.com/maglo/qemu-lab-manager/issues/16)."
+  - "inventory - keep the entry that last loaded when a file does not load,
+    and name the file in `/healthz`. A typo takes down one machine at most.
+    The first load is strict, so labview does not start with a file it cannot
+    read."
+  - "api - serve everything the wall shows as JSON. The browser application
+    is one consumer and a test harness is another, and neither gets a
+    privileged path."

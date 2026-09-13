@@ -1,0 +1,7 @@
+---
+release_summary: >-
+  The first release of labview, the console wall of the QEMU lab. It shows
+  every machine of one hypervisor on one page, and it opens the framebuffer,
+  the serial line, the journal and the details of a machine without an SSH
+  session on the host. It is one Go binary, one inventory directory and no
+  database.
