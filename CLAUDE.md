@@ -13,6 +13,7 @@ qemu-lab-manager holds the tooling for the QEMU lab. It builds one Go binary,
 | `internal/` | The packages of the service. |
 | `internal/web/static` | The browser application. |
 | `docs/design/` | One design document for each component. |
+| `changelogs/` | The changelog fragments and the released entries. |
 | `test/lab` | The fake lab and the browser checks. |
 | `deploy/` | The systemd unit, the polkit rule and the nginx file. |
 | `scripts/` | The check scripts. |
@@ -27,10 +28,11 @@ Every change follows these steps.
 1. Find an issue, or file one. Every pull request has an issue.
 2. Make a branch from `main`.
 3. Make the change. Update the documents in the same branch.
-4. Open a pull request. Write `Closes #<number>` in the description.
-5. Make the checks pass.
-6. The owner reviews the pull request.
-7. The owner merges the pull request.
+4. Write a changelog fragment in `changelogs/fragments/`.
+5. Open a pull request. Write `Closes #<number>` in the description.
+6. Make the checks pass.
+7. The owner reviews the pull request.
+8. The owner merges the pull request.
 
 ## Limits for the agent
 
@@ -41,6 +43,8 @@ Every change follows these steps.
 - Do not close an issue by hand. The merge closes it through the link.
 - File the issue before you open the pull request.
 - Ask the user before you do work that the issue does not name.
+- Do not edit `CHANGELOG.md` or `changelogs/changelog.yaml`. The release
+  writes both files.
 
 ## Review and merge
 
@@ -98,6 +102,7 @@ go test -race ./...           # the Go tests
 test/lab/run.sh               # labview in a browser, against a fake lab
 ./scripts/check-docs.sh       # the markdown rules
 ./scripts/check-workflows.sh  # the gate of each workflow
+./scripts/check-changelog.sh  # the changelog fragments
 ```
 
 `test/lab/run.sh` needs Node and Python in addition to Go.
@@ -125,10 +130,13 @@ the commands for a local machine.
   a space. A file ends with a newline.
 - `workflows` checks that the gate job of each workflow depends on every other
   job of that workflow.
+- `changelog` checks each fragment in `changelogs/fragments/`, and it checks
+  that `CHANGELOG.md` matches `changelogs/changelog.yaml`.
 - `pull request rules` checks the description and the issue. The description
-  closes an issue, and that issue has one type label.
+  closes an issue, and that issue has one type label. The pull request also
+  adds a changelog fragment.
 
-`ci.yml` runs two jobs for the Go code.
+`ci.yml` runs three jobs for the Go code.
 
 - `build, vet and test` runs `gofmt`, `go vet`, the build and the tests. The
   tests run with the race detector.
@@ -142,6 +150,29 @@ not pass. A skipped job and a cancelled job also fail the gate.
 The ruleset of `main` names the two gate jobs, and it names no other job. A new
 job therefore needs no change in the ruleset. Add each new job to the `needs`
 list of the gate. The `workflows` check fails if you forget.
+
+## Changelog
+
+Every pull request writes one file in `changelogs/fragments/`. Name the file
+`<issue>-<slug>.yaml`.
+
+```yaml
+---
+bugfixes:
+  - "serial - the broker drops a subscriber that does not read
+    (https://github.com/maglo/qemu-lab-manager/issues/42)."
+```
+
+`changelogs/fragments/README.md` lists each section. Use `trivial` for a
+change that the operator of a lab never sees, such as a check, a script or a
+document. A `trivial` entry does not reach `CHANGELOG.md`.
+
+Start the entry with the component. End the entry with a period. Put the URL
+of the issue at the end.
+
+The owner cuts a release with `./scripts/changelog.py release --version X.Y.Z`
+and then tags the merge commit `vX.Y.Z`. `docs/design/changelog.md` gives the
+whole process.
 
 ## Documents
 

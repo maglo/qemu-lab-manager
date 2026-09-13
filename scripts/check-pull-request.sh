@@ -32,3 +32,23 @@ if [ "$types" -ne 1 ]; then
 	exit 1
 fi
 echo "type label: ok"
+
+# A release pull request compiles the fragments away, so it adds none.
+if ! files=$(gh pr view "$(jq -r '.pull_request.number' "$event")" \
+	--repo "$repo" --json files --jq '.files[].path'); then
+	echo "error: the check cannot read the files of the pull request"
+	exit 1
+fi
+
+if printf '%s\n' "$files" | grep -q '^CHANGELOG\.md$'; then
+	echo "changelog fragment: not needed, this is a release"
+	exit 0
+fi
+
+if ! printf '%s\n' "$files" | grep -q '^changelogs/fragments/.*\.ya\?ml$'; then
+	echo "error: the pull request adds no changelog fragment"
+	echo "       write one file in changelogs/fragments/"
+	echo "       changelogs/fragments/README.md gives the format"
+	exit 1
+fi
+echo "changelog fragment: ok"
