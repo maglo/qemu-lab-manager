@@ -1,0 +1,82 @@
+name: release
+
+# A tag is the release. The owner merges the release pull request, which holds
+# the compiled CHANGELOG.md, and then tags the merge commit.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: binaries and notes
+    runs-on: ubuntu-latest
+    permissions:
+      # To create the release and to attach the binaries.
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: the version of the tag
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#v}" >>"$GITHUB_OUTPUT"
+
+      # The tag must name a release that CHANGELOG.md holds. A tag that runs
+      # ahead of the release pull request fails here, before the release
+      # exists, rather than producing a release with no notes.
+      - name: the notes of this version
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          python3 scripts/changelog.py notes --version "$VERSION" >notes.md
+          cat notes.md
+
+      # The same flags as the container image, so a binary from the release
+      # and a binary from the image report the same version.
+      - name: build
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          mkdir -p dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            os=${target%/*}
+            arch=${target#*/}
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath \
+              -ldflags "-s -w -X main.version=$VERSION" \
+              -o "dist/labview-$os-$arch" ./cmd/labview
+          done
+          cd dist && sha256sum labview-* >SHA256SUMS && cat SHA256SUMS
+
+      - name: create the release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: notes.md
+          files: dist/*
+          fail_on_unmatched_files: true
+
+  # The ruleset of main names no job of this workflow, because a tag is not a
+  # pull request. The gate keeps the rule that each workflow has one.
+  gate:
+    name: release passed
+    needs: [release]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: check the results
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "error: a job of this workflow did not pass"
+              exit 1
+            fi
+          done

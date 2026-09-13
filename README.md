@@ -144,6 +144,18 @@ The systemd unit above is still the full deployment.
 [`docs/design/container.md`](docs/design/container.md) gives the reasons and
 lists the mounts.
 
+### Releases
+
+Each release is a tag, `v0.1.0`, and a GitHub release that carries the notes
+and a binary for Linux and macOS on both architectures. `ci.yml` publishes the
+image again under the version, so `labview:0.1.0` and `labview:0.1` name the
+release beside `latest`.
+
+[`CHANGELOG.md`](CHANGELOG.md) is what changed. A pull request does not edit
+it: it writes one file in `changelogs/fragments/`, and a release compiles the
+fragments. [`docs/design/changelog.md`](docs/design/changelog.md) gives the
+reason and the release steps.
+
 ### The API
 
 Everything the UI shows is also JSON. The UI is one consumer, a test harness
@@ -229,6 +241,7 @@ forwards raw bytes and lets the browser decode incrementally.
     internal/activity/     who did what
     deploy/                unit file, polkit rule, proxy configuration
     test/lab/              a fake QEMU lab, and browser-driven checks
+    changelogs/            the fragments, and the released entries
     Dockerfile             the container image
     .github/workflows/     CI: build, vet, race tests, browser checks,
-                           and the image
+                           the image, and the release
