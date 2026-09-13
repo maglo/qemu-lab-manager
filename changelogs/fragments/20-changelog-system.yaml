@@ -1,7 +1,0 @@
----
-trivial:
-  - "repository - maintain the changelog with a fragment file for each pull
-    request. `scripts/changelog.py` lints the fragments, compiles them into a
-    release and prints the notes of a release. A `v*` tag builds the binaries
-    and creates a GitHub release
-    (https://github.com/maglo/qemu-lab-manager/issues/20)."
