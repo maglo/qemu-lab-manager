@@ -446,6 +446,14 @@ Four rules:
 - labview runs as its own user, not root, with a polkit rule granting unit
   management over just those units.
 
+That rule is `deploy/50-labview-units.rules`, and its default pattern accepts
+`qemu-<machine>.service` and the instance form `qemu-vm@<machine>.service`.
+The instance form is what `maglo.qemu` writes, so the shipped rule matches a
+lab that the collection built. A default that matches nothing is worse than a
+wide one here: polkit returns `NOT_HANDLED` for a unit the rule skips,
+`NOT_HANDLED` denies, and every power click then fails in a way that reads as
+a labview fault. A deployer narrows the pattern to the lab's own naming.
+
 Restart is the only destructive thing in an otherwise read-mostly tool, so
 it confirms in the UI and is logged with the identity from the proxy.
 
