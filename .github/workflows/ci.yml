@@ -3,11 +3,10 @@ name: CI
 on:
   push:
     branches: [main]
-    # A release tag runs the checks again and publishes a version tagged image.
+    # A release tag runs the checks again on the commit that it names.
     tags: ['v*']
   pull_request:
 
-# Read-only. The container job raises its own permission to publish a package.
 permissions:
   contents: read
 
@@ -93,74 +92,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  container:
-    name: container image
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      # To publish the image to the registry of this repository.
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      # A pull request builds the image and publishes nothing, so a broken
-      # Dockerfile fails the check before main gets an image from it.
-      - name: log in to the registry
-        if: github.event_name == 'push'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # A tag build reports the released version, and every other build
-      # reports the commit. `git describe` is not available: the checkout is
-      # shallow and carries no tag.
-      - name: the version to stamp
-        id: version
-        run: |
-          version="${GITHUB_SHA}"
-          case "$GITHUB_REF" in
-            refs/tags/v*) version="${GITHUB_REF_NAME#v}" ;;
-          esac
-          echo "value=$version" >>"$GITHUB_OUTPUT"
-
-      - name: tags and labels
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}/labview
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      # The build stage cross-compiles, so the two architectures need no
-      # emulation and no second runner.
-      - name: build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          annotations: ${{ steps.meta.outputs.annotations }}
-          build-args: |
-            VERSION=${{ steps.version.outputs.value }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
   # The ruleset of main names this job, and not the jobs above it. A new job
   # above needs no change in the ruleset.
   gate:
     name: ci passed
-    needs: [check, e2e, container]
+    needs: [check, e2e]
     if: always()
     runs-on: ubuntu-latest
     steps:

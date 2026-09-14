@@ -19,7 +19,6 @@ qemu-lab-manager holds the tooling for the QEMU lab. It builds one Go binary,
 | `deploy/` | The systemd unit, the polkit rule and the nginx file. | [`labview.md`](docs/design/labview.md) |
 | `scripts/` | The check scripts. | [`checks.md`](docs/design/checks.md) |
 | `.github/workflows/` | The workflows. | [`checks.md`](docs/design/checks.md) |
-| `Dockerfile` | The container image. | [`container.md`](docs/design/container.md) |
 
 A design document gives the reason for a decision. `README.md` gives the build
 command and the run command.

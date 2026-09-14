@@ -50,14 +50,13 @@ fragment, so the check lets it pass.
 
 ## 4. `ci.yml`
 
-The Go code and the image. It runs on a pull request, on a push to `main` and
-on a `v*` tag.
+The Go code. It runs on a pull request, on a push to `main` and on a `v*`
+tag.
 
 | Job | What it does |
 |---|---|
 | `build, vet and test` | `gofmt`, `go vet`, the build and the tests. |
 | `browser checks` | labview in a browser, against a fake lab. |
-| `container image` | The image, built always and pushed on a push. |
 
 The tests run with the race detector. The broker fans one upstream connection
 out to many subscribers under one lock, so a regression there is a data race
@@ -67,10 +66,6 @@ long before it is a visible bug.
 quicker to read from an image than from an assertion message.
 [`test/lab/README.md`](../../test/lab/README.md) says why the browser layer
 exists and how to add a check.
-
-A pull request builds the image and pushes nothing, so a broken `Dockerfile`
-fails the check before `main` gets an image from it.
-[`container.md`](container.md) gives the design of the image.
 
 ## 5. `release.yml`
 
@@ -84,12 +79,8 @@ It reads the notes of that version first. A tag that runs ahead of the
 release pull request names a version that `changelogs/changelog.yaml` does
 not hold, and the job fails there, before it creates a release with no notes.
 
-The job adds one section to the notes: the command that pulls the image of
-this release. The release page is where a reader looks for a release, so the
-page names the registry. The job derives the image name from the repository,
-as `ci.yml` does, so one name cannot drift from the other.
-
-`ci.yml` runs on the tag as well, so the image carries the version.
+The binaries are what a release ships. `ci.yml` runs on the tag as well, so
+the commit that the tag names passes the same checks as a pull request.
 [`changelog.md`](changelog.md) gives the release process.
 
 ## 6. The gate

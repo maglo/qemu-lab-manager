@@ -50,16 +50,13 @@ layer exists, and how to add a check.
 `-host-access fake` invents plausible machine details so the UI can be worked
 on. It is never a fallback and has to be asked for.
 
-Each commit on `main` also publishes an image:
-
-    podman pull ghcr.io/maglo/qemu-lab-manager/labview:latest
+Each release attaches a binary for Linux and macOS on both architectures.
 
 ## Read next
 
 | Document | What it covers |
 |---|---|
 | [`docs/design/labview.md`](docs/design/labview.md) | What labview is and why. The inventory format, the HTTP and websocket surface, the serial broker, the write lease, power operations, deployment and trust. |
-| [`docs/design/container.md`](docs/design/container.md) | The image: what it holds, what it cannot do, and what the host must lend it. |
 | [`docs/design/changelog.md`](docs/design/changelog.md) | How a change reaches the changelog, and how a release is cut. |
 | [`docs/design/checks.md`](docs/design/checks.md) | Every workflow and every job, and the commands to run before a push. |
 | [`test/lab/README.md`](test/lab/README.md) | The fake lab, and how to add a browser check. |
