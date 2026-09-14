@@ -120,6 +120,8 @@ another, and neither gets a privileged path.
 | `GET /api/machines/{id}/activity` | Who attached when, who holds control |
 | `POST /api/machines/{id}/lease` | Acquire, renew or release |
 | `POST /api/machines/{id}/power` | Start, stop or restart |
+| `POST /api/machines/{id}/keys` | Send one chord over the control socket |
+| `GET /api/machines/{id}/screenshot` | One frame of the screen, as PNG |
 | `GET /api/activity` | The activity of every machine |
 | `GET /api/config` | The settings the browser application needs |
 | `GET /ws/console/{id}` | Binary RFB, proxied to the VNC port |
@@ -151,6 +153,7 @@ name: el9-build
 host: kvm01
 vnc: 10.20.0.11:5901
 serial: /run/qemu/el9-build-serial.sock
+control: /run/qemu/el9-build-qmp.sock
 unit: qemu-el9-build.service
 notes: AlmaLinux 9
 ```
@@ -192,11 +195,16 @@ producer newer than labview does not break the load.
 
 `serial` is a unix socket path when labview runs on the hypervisor, or
 `host:port` when it doesn't. Either is a `net.Dial`, so the broker does not
-care which.
+care which. `control` is the QMP socket of the machine, and it is classified
+the same way.
 
-Neither `vnc` nor `serial` is ever sent to the browser. Clients name a
+None of `vnc`, `serial` and `control` reaches the browser. Clients name a
 machine by `id` only, so a developer cannot dial a console the inventory did
 not give them.
+
+The details tab shows every other field verbatim, so a new address field
+joins the withheld set in the same change that makes it a known field. Until
+it does, the verbatim rule publishes it to every viewer.
 
 ---
 
@@ -288,15 +296,12 @@ wants a systemd tool needs a better reason than convenience.
 **Stealing a lease.** Expiry covers the common case. Add stealing only if
 expiry turns out to be too slow in practice.
 
+**The screenshot tile.** The tile is a component with a pluggable renderer,
+and `-tile-mode=screenshot` selects the other one, as section 7 asks. The
+renderer has no capture source yet, so it says what it waits for.
+
 **Recording and replay of framebuffer sessions.** Serial transcripts give
 most of the forensic value at a fraction of the cost.
-
-**The screenshot tile.** The tile is a component with a pluggable renderer,
-and `-tile-mode=screenshot` selects the other one, as section 7 asks. There
-is no capture source behind it. A server-side screenshot means either QMP
-screendump, which section 12 ruled out in favour of systemd, or decoding RFB
-in the server. Neither is settled, so the renderer says what it waits for
-rather than inventing an endpoint.
 
 ---
 
@@ -429,7 +434,9 @@ architectures.
 
 ---
 
-## 12. Power operations
+## 12. Power, input and capture
+
+### Power goes through systemd
 
 Start, stop and restart are in v1, and they go through **systemd, not QMP**.
 
@@ -463,6 +470,49 @@ a labview fault. A deployer narrows the pattern to the lab's own naming.
 
 Restart is the only destructive thing in an otherwise read-mostly tool, so
 it confirms in the UI and is logged with the identity from the proxy.
+
+### Input and capture go through QMP
+
+The choice above is about power alone. Input and capture are a different
+question, and the answer is the QMP socket that the `control` field of
+section 6 names. labview sends a key chord with `send-key` and takes a frame
+with `screendump`. It runs no other QMP command, and power stays with
+systemd.
+
+`POST /api/machines/{id}/keys` sends one chord: QEMU presses every key of
+one call together and releases them together. It takes the write lease, the
+same one that gates the framebuffer and the serial line, because the
+keyboard is the keyboard whichever way it is reached. A chord is input, so
+it also pushes the expiry of that lease out.
+
+`GET /api/machines/{id}/screenshot` needs no lease. The wall is view-only
+for everyone and shows every machine's screen already, so a capture of that
+screen is a read, and read is free. The screenshot wall of section 7 is the
+case that decides it: nobody holds a lease on forty machines.
+
+`screendump` writes PNG only. The same frame measures 10,790 bytes as PNG
+and 864,015 bytes as PPM, and QEMU defaults to PPM: the filename extension
+is not consulted. QEMU writes the file itself, as its own user and in its
+own filesystem namespace, so the path is absolute and the directory belongs
+to QEMU as well as to labview. `-screenshot-dir` names it, and the unit
+gives QEMU write access to it. It cannot be labview's own `/tmp`, because
+the unit sets `PrivateTmp`. labview reads the file and removes it: a frame
+of somebody's screen does not stay on disk.
+
+A QMP client must skip asynchronous `event` lines before it matches a reply.
+A client that takes the next line for its reply reads the wrong one for
+every command after it, and the symptom looks exactly like `screendump`
+returning before the file exists.
+
+A QMP socket takes one client at a time, like a serial chardev. The serial
+line needs a broker because output arrives whether or not anybody listens.
+QMP does not: every message answers a request. So labview dials for one
+exchange and closes, and it lets one exchange at a time onto a machine.
+
+An error on the control socket names the socket, so the client is told that
+the machine did not answer and the text stays in labview's log. QEMU's own
+refusal is different: it names the command and the parameter, never the
+socket, so a harness reads it.
 
 ---
 

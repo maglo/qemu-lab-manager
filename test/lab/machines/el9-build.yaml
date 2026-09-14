@@ -2,5 +2,6 @@ name: el9-build
 host: kvm01
 vnc: 127.0.0.1:15901
 serial: /tmp/labview-lab/el9-build.sock
+control: /tmp/labview-lab/el9-build-qmp.sock
 unit: qemu-el9-build.service
 notes: AlmaLinux 9 build box

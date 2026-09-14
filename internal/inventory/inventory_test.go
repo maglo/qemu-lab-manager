@@ -51,6 +51,7 @@ func TestViewNeverLeaksAddresses(t *testing.T) {
 host: kvm01
 vnc: 10.20.0.11:5901
 serial: /run/qemu/m.sock
+control: /run/qemu/m-qmp.sock
 unit: qemu-m.service
 notes: n
 `,
@@ -62,12 +63,16 @@ notes: n
 	}
 	got := string(blob)
 
-	for _, secret := range []string{"10.20.0.11", "5901", "/run/qemu/m.sock", "qemu-m.service"} {
+	for _, secret := range []string{"10.20.0.11", "5901", "/run/qemu/m.sock",
+		"/run/qemu/m-qmp.sock", "qemu-m.service"} {
 		if strings.Contains(got, secret) {
 			t.Errorf("view leaked %q to the browser: %s", secret, got)
 		}
 	}
 	// It must still say enough for the UI to render.
+	if !strings.Contains(got, `"hasControl":true`) {
+		t.Errorf("view omits the control flag the tile needs: %s", got)
+	}
 	if !strings.Contains(got, `"hasConsole":true`) || !strings.Contains(got, `"hasSerial":true`) {
 		t.Errorf("view omits the capability flags the UI needs: %s", got)
 	}
@@ -143,6 +148,37 @@ func TestParseRejectsMalformedAddresses(t *testing.T) {
 	}
 	if _, err := ParseMachine("a", []byte("serial: not-a-socket\n")); err == nil {
 		t.Error("serial that is neither a path nor host:port was accepted")
+	}
+	if _, err := ParseMachine("a", []byte("control: not-a-socket\n")); err == nil {
+		t.Error("control that is neither a path nor host:port was accepted")
+	}
+}
+
+// The control socket carries input and screen capture (design section 12). It
+// is classified exactly as the serial line is, because either is a dial.
+func TestControlChannel(t *testing.T) {
+	none, err := ParseMachine("a", []byte("name: a\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if none.HasControl() {
+		t.Error("a machine with no control field reports a control channel")
+	}
+
+	unix, err := ParseMachine("a", []byte("control: /var/lib/qemu/a/qmp.sock\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !unix.HasControl() || unix.ControlNetwork() != "unix" {
+		t.Errorf("ControlNetwork = %q, want unix", unix.ControlNetwork())
+	}
+
+	tcp, err := ParseMachine("a", []byte("control: kvm01:4444\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tcp.ControlNetwork() != "tcp" {
+		t.Errorf("ControlNetwork = %q, want tcp", tcp.ControlNetwork())
 	}
 }
 

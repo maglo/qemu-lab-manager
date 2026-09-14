@@ -23,6 +23,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/host"
 	"github.com/maglo/qemu-lab-manager/labview/internal/inventory"
 	"github.com/maglo/qemu-lab-manager/labview/internal/lease"
+	"github.com/maglo/qemu-lab-manager/labview/internal/qmp"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
 	"github.com/maglo/qemu-lab-manager/labview/internal/web"
 )
@@ -107,6 +108,11 @@ func run(args []string) error {
 		Log: log,
 	})
 
+	control := qmp.NewManager(qmp.Options{
+		CaptureDir: cfg.CaptureDir,
+		Timeout:    cfg.ControlTimeout,
+	})
+
 	ui, err := web.Handler()
 	if err != nil {
 		return fmt.Errorf("ui: %w", err)
@@ -118,6 +124,7 @@ func run(args []string) error {
 		Brokers:   brokers,
 		Leases:    leases,
 		Hosts:     hosts,
+		Control:   control,
 		Activity:  activity.New(cfg.ActivityCapacity, log),
 		Log:       log,
 		UI:        ui,
@@ -154,6 +161,7 @@ func run(args []string) error {
 		"host_access", string(cfg.HostAccess),
 		"tile_mode", string(cfg.TileMode),
 		"recordings", cfg.TranscriptDir,
+		"screenshots", cfg.CaptureDir,
 	)
 	if cfg.TranscriptDir == "" {
 		log.Warn("serial capture is disabled; no recordings will be written")

@@ -24,6 +24,16 @@ async function onlyPanelVisible(page, tab) {
     `only the ${tab} panel is visible (visible: ${visible.join(',') || 'none'})`);
 }
 
+// postKeys sends one chord through the API, as a harness would.
+//
+// It goes through the browser's request context rather than through a fetch
+// in the page: a refusal is one of the things under test here, and an
+// in-page fetch would log it as a console error the run then fails on.
+async function postKeys(page, id, keys) {
+  const res = await page.request.post(`${BASE}/api/machines/${id}/keys`, { data: { keys } });
+  return { status: res.status(), body: await res.json() };
+}
+
 // tileCount waits for the wall to settle on a number of tiles. The wall
 // polls, so a change in the inventory directory needs one poll to show.
 async function tileCount(page, want) {
@@ -135,6 +145,11 @@ async function tileCount(page, want) {
   check(await page.isDisabled('#power-restart'), 'restart is disabled without the lease');
   check(await page.isDisabled('#cad'), 'Ctrl+Alt+Del is disabled without the lease');
 
+  // The keyboard is the keyboard whichever way it is reached, so the control
+  // channel takes the same lease.
+  const refused = await postKeys(page, 'el9-build', ['ret']);
+  check(refused.status === 409, `the keys endpoint refuses a viewer (got ${refused.status})`);
+
   // --- serial tab ---
   await page.click('#tabs button[data-tab="serial"]');
   await page.waitForTimeout(1500);
@@ -163,6 +178,18 @@ async function tileCount(page, want) {
   check(/whoami/.test(echoed), 'keystrokes reach the machine once the lease is held');
   await page.screenshot({ path: `${OUT}/04-serial-control.png` });
 
+  // --- the control channel: a chord over QMP, and a capture ---
+  const chord = await postKeys(page, 'el9-build', ['ctrl', 'alt', 'f3']);
+  check(chord.status === 200, `a chord reaches the machine with the lease (got ${chord.status})`);
+  const shot = await page.request.get(`${BASE}/api/machines/el9-build/screenshot`);
+  const magic = (await shot.body()).subarray(1, 4).toString();
+  check(shot.status() === 200 && shot.headers()['content-type'] === 'image/png' && magic === 'PNG',
+    `screendump answers with a PNG (${shot.status()}, ${magic})`);
+
+  // A machine with no control socket says it has none rather than failing.
+  const none = await page.request.get(`${BASE}/api/machines/no-console/screenshot`);
+  check(none.status() === 501, `a machine with no control socket answers 501 (got ${none.status()})`);
+
   // --- power, then details ---
   await page.click('#power-start');
   await page.waitForTimeout(2000);
@@ -174,8 +201,10 @@ async function tileCount(page, want) {
   check(/qemu-el9-build\.service/.test(details), 'details tab shows the systemd unit name');
   check(/virtio-net-pci|tap-el9/.test(details), 'details tab shows the network interface');
   check(/4096|MiB/.test(details), 'details tab shows memory');
-  check(/withheld/.test(details), 'inventory entry marks the withheld addresses');
+  check((details.match(/withheld/g) || []).length >= 3,
+    'inventory entry marks vnc, serial and control as withheld');
   check(!/10\.20\.0\.11|\/run\/qemu/.test(details), 'inventory entry does not leak an address');
+  check(!/labview-lab.*\.sock/.test(details), 'inventory entry does not leak the control socket path');
   const copyButtons = await page.$$('#details .copywrap button');
   check(copyButtons.length >= 2, `copy buttons on every block (got ${copyButtons.length})`);
   await page.screenshot({ path: `${OUT}/05-details.png`, fullPage: true });

@@ -179,8 +179,12 @@ func (s *Server) handleMachine(w http.ResponseWriter, r *http.Request) {
 }
 
 // redactedEntry returns the machine's file as written, with the id its name
-// gives, and with the two address fields section 6 names replaced by a
-// marker.
+// gives, and with the address fields section 6 names replaced by a marker.
+//
+// Every other field is shown verbatim, so a field written by a producer newer
+// than labview still reaches the details tab. That is why a new address field
+// joins this list in the same change that makes it a known field: until it
+// does, the verbatim rule publishes it.
 //
 // The unit name is *not* withheld: section 8 lists it among the things the
 // details tab shows. Section 12's rule is that a client never *names* a unit
@@ -193,7 +197,7 @@ func redactedEntry(m inventory.Machine) map[string]any {
 		entry[k] = v
 	}
 	entry["id"] = m.ID
-	for _, address := range []string{"vnc", "serial"} {
+	for _, address := range []string{"vnc", "serial", "control"} {
 		if _, present := entry[address]; present {
 			// Say that something was withheld rather than silently
 			// dropping it: a developer reading the details tab should not
@@ -297,11 +301,13 @@ func (s *Server) handleAllActivity(w http.ResponseWriter, r *http.Request) {
 // renderer to use, and who the proxy says it is.
 func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"tileMode":         string(s.cfg.TileMode),
-		"identity":         s.identity(r),
-		"leaseIdleSeconds": int(s.cfg.LeaseIdle.Seconds()),
-		"recordings":       s.cfg.TranscriptDir != "",
-		"hostAccess":       string(s.cfg.HostAccess),
+		"tileMode":          string(s.cfg.TileMode),
+		"identity":          s.identity(r),
+		"leaseIdleSeconds":  int(s.cfg.LeaseIdle.Seconds()),
+		"recordings":        s.cfg.TranscriptDir != "",
+		"hostAccess":        string(s.cfg.HostAccess),
+		"screenshots":       s.control.CaptureEnabled(),
+		"screenshotEveryMs": s.cfg.CaptureInterval.Milliseconds(),
 	})
 }
 
