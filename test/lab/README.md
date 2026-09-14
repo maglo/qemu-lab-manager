@@ -55,6 +55,16 @@ It writes a real PNG, of a different colour each time. That is what lets a
 check see a screenshot tile take a new frame instead of keeping the first
 one.
 
+## Two labviews
+
+`run.sh` starts a second labview on `$SHOT_PORT`, on the same inventory, with
+`-tile-mode=screenshot`. The mode is a flag, so a second process is the only
+way to drive both walls in one run.
+
+The driver opens that one directly instead of through the proxy, so it is
+unidentified and holds no lease. That is the point: a screenshot is a read,
+and read is free.
+
 ## The proxy is not incidental
 
 It asserts the identity **on the websocket upgrade as well as on ordinary

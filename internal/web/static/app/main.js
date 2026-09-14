@@ -13,7 +13,10 @@ import { $, el, clear, toast, when } from './dom.js';
 const WALL_POLL_MS = 4000;
 
 const state = {
-  config: { tileMode: 'rfb', identity: '', leaseIdleSeconds: 180, recordings: true },
+  config: {
+    tileMode: 'rfb', identity: '', leaseIdleSeconds: 180, recordings: true,
+    screenshots: false, screenshotEveryMs: 5000,
+  },
   summaries: new Map(),
   tiles: new Map(),
   open: null,        // machine id, when expanded
@@ -99,6 +102,7 @@ async function refreshWall() {
     if (!tile) {
       tile = new Tile(summary, {
         tileMode: state.config.tileMode,
+        screenshotEveryMs: state.config.screenshotEveryMs,
         onOpen: (id) => navigate(id),
       });
       state.tiles.set(summary.id, tile);

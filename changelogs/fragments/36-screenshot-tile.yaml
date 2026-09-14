@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - "web - a screenshot tile shows a real picture. ``-tile-mode=screenshot`` now has a capture source: the tile asks for one frame at a time over QMP ``screendump``, and a tile whose machine has no control socket says so (https://github.com/maglo/qemu-lab-manager/issues/36)."
+  - "labview - ``-screenshot-dir`` names the directory QEMU writes a capture to, and ``-screenshot-interval`` sets how often a tile asks for a new frame. labview reads each capture and removes it (https://github.com/maglo/qemu-lab-manager/issues/36)."
+  - "qmp - the client skips asynchronous ``event`` lines before it matches a reply. A client that takes the next line for its reply reads the wrong one for every command after it (https://github.com/maglo/qemu-lab-manager/issues/36)."

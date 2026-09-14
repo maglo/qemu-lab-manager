@@ -11,9 +11,10 @@ import { SerialView } from './serial.js';
 import { el, clear } from './dom.js';
 
 export class Tile {
-  constructor(summary, { tileMode, onOpen }) {
+  constructor(summary, { tileMode, screenshotEveryMs, onOpen }) {
     this.summary = summary;
     this.tileMode = tileMode;
+    this.screenshotEveryMs = screenshotEveryMs;
     this.onOpen = onOpen;
     this.renderer = null;
 
@@ -71,7 +72,7 @@ export class Tile {
 
     if (this.summary.hasConsole) {
       this.renderer = this.tileMode === 'screenshot'
-        ? new ScreenshotRenderer(this.summary)
+        ? new ScreenshotRenderer(this.summary, { everyMs: this.screenshotEveryMs })
         : new RFBRenderer(this.summary, { onState: () => this.paintState() });
     } else if (this.summary.hasSerial) {
       // Serial-only: the tile is a serial tail (design section 7).

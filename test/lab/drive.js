@@ -2,6 +2,8 @@ const { chromium } = require('playwright');
 
 // Through the proxy by default, so the run exercises section 10's topology.
 const BASE = process.env.LABVIEW_URL || 'http://127.0.0.1:18081';
+// The wall in screenshot mode is a second labview, because the mode is a flag.
+const SHOT_URL = process.env.SHOT_URL || 'http://127.0.0.1:18082';
 const OUT = process.env.SHOTS_DIR || __dirname + '/shots';
 const fs = require('fs');
 fs.mkdirSync(OUT, { recursive: true });
@@ -254,6 +256,34 @@ async function tileCount(page, want) {
 
   fs.unlinkSync(newFile);
   check(await tileCount(page, 4), 'a deleted machine file leaves the wall');
+
+  // --- the screenshot wall ---
+  //
+  // A second labview, started with -tile-mode=screenshot on the same
+  // inventory. It is driven directly rather than through the proxy: a
+  // screenshot needs no lease, so it needs no identity either.
+  const shotPage = await ctx.newPage();
+  shotPage.on('console', (m) => { if (m.type() === 'error') recordError(m.text()); });
+  shotPage.on('pageerror', (e) => recordError('pageerror: ' + e.message));
+  await shotPage.goto(SHOT_URL, { waitUntil: 'networkidle' });
+  await shotPage.waitForTimeout(3000);
+
+  const painted = await shotPage.$$eval('.tile-shot',
+    (imgs) => imgs.filter((i) => i.naturalWidth > 0).map((i) => i.naturalWidth));
+  check(painted.length === 1 && painted[0] === 160,
+    `a screenshot tile paints the captured frame (widths ${painted.join(',') || 'none'})`);
+
+  const firstFrame = await shotPage.$eval('.tile-shot', (i) => i.src);
+  await shotPage.waitForTimeout(2500);
+  const nextFrame = await shotPage.$eval('.tile-shot', (i) => i.src);
+  check(firstFrame !== nextFrame, 'the screenshot tile takes a new frame');
+
+  // A machine with a framebuffer but no control socket says what it lacks.
+  const shotText = await shotPage.textContent('#tiles');
+  check(/no control socket/.test(shotText),
+    'a tile with no capture source says why it has no picture');
+  await shotPage.screenshot({ path: `${OUT}/11-screenshot-wall.png` });
+  await shotPage.close();
 
   console.log(`\n--- console errors (${expected.length} expected, ignored) ---`);
   if (errors.length === 0) console.log('(none unexpected)');

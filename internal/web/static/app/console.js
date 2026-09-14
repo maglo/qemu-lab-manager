@@ -5,7 +5,7 @@
 // which proxies binary RFB to the machine's VNC port.
 
 import RFB from '/vendor/novnc/core/rfb.js';
-import { ws } from './api.js';
+import { api, ws } from './api.js';
 import { el } from './dom.js';
 
 // RFBRenderer wraps one noVNC session.
@@ -89,28 +89,80 @@ export class RFBRenderer {
 // ScreenshotRenderer is the other half of section 7's tile seam.
 //
 // Beyond roughly eight tiles, every live RFB session is a decoder running in
-// one browser tab, so the wall should switch to periodic screenshots and open
-// RFB only on click. The tile is therefore built so that this is a
-// configuration change and not a rewrite -- labview is started with
-// -tile-mode=screenshot and the wall uses this renderer instead.
+// one browser tab, so the wall switches to periodic screenshots and opens RFB
+// only on click. labview is started with -tile-mode=screenshot and the wall
+// uses this renderer instead, which is a configuration change and not a
+// rewrite.
 //
-// The image source is the missing piece, and deliberately so: taking a
-// screenshot server-side means either QMP screendump, which design section 12
-// ruled out in favour of systemd, or decoding RFB in the server, which is a
-// framebuffer decoder labview does not otherwise need. Neither is settled, so
-// this renderer says what it is waiting for rather than inventing an endpoint.
+// The frames come from QMP screendump through /api/machines/{id}/screenshot.
+// One request is one frame, and the next request waits for the previous one
+// to arrive: a machine that answers slowly then falls behind on its own
+// instead of queueing requests the wall cannot draw.
 export class ScreenshotRenderer {
-  constructor(machine) {
+  constructor(machine, { everyMs = 5000 } = {}) {
     this.machine = machine;
-    this.element = el('div', { class: 'tile-placeholder' },
-      'Screenshot tiles need a capture source on the hypervisor, ' +
-      'which is not implemented yet. Click to open the live console.');
-    this.state = 'placeholder';
+    this.everyMs = everyMs;
+    this.timer = null;
+    this.stopped = false;
+    this.url = null;
+
+    this.image = el('img', { class: 'tile-shot', alt: `Screen of ${machine.name}` });
+    this.note = el('div', { class: 'tile-placeholder' }, 'Waiting for the first screenshot.');
+    this.element = el('div', { class: 'shot-host' }, this.image, this.note);
+    this.state = 'connecting';
   }
 
-  connect() {}
+  connect() {
+    if (!this.machine.hasControl) {
+      this.fail('This machine has no control socket in the inventory, so labview cannot capture its screen.');
+      return;
+    }
+    this.tick();
+  }
+
+  async tick() {
+    if (this.stopped) return;
+    try {
+      const res = await fetch(api.screenshotURL(this.machine.id), { cache: 'no-store' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error((body && body.error) || `${res.status} ${res.statusText}`);
+      }
+      this.show(await res.blob());
+    } catch (err) {
+      this.fail(String(err.message || err));
+    }
+    if (!this.stopped) this.timer = setTimeout(() => this.tick(), this.everyMs);
+  }
+
+  show(blob) {
+    const next = URL.createObjectURL(blob);
+    // Revoke the frame this one replaces, or a tile leaks one blob per
+    // interval for as long as the wall is open.
+    if (this.url) URL.revokeObjectURL(this.url);
+    this.url = next;
+    this.image.src = next;
+    this.image.hidden = false;
+    this.note.hidden = true;
+    this.state = 'connected';
+  }
+
+  fail(message) {
+    this.note.textContent = message;
+    this.note.hidden = false;
+    this.image.hidden = true;
+    this.state = 'failed';
+  }
+
   setViewOnly() {}
   sendCtrlAltDel() {}
   focus() {}
-  destroy() {}
+  fit() {}
+
+  destroy() {
+    this.stopped = true;
+    if (this.timer) clearTimeout(this.timer);
+    if (this.url) URL.revokeObjectURL(this.url);
+    this.url = null;
+  }
 }
