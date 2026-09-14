@@ -108,12 +108,29 @@ developer from typing into a VM mid-test, and it needs no special
 
 ## 5. HTTP surface
 
+Everything the UI shows is also JSON. The UI is one consumer, a harness is
+another, and neither gets a privileged path.
+
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/machines` | Inventory plus liveness and current lease holder |
+| `GET /api/machines/{id}` | The whole record: details, disks, network, unit, recordings, activity |
+| `GET /api/machines/{id}/logs?lines=N` | Recent journal lines |
+| `GET /api/machines/{id}/recordings` | Past serial captures |
+| `GET /api/machines/{id}/recordings/{name}` | One capture, asciicast v2 |
+| `GET /api/machines/{id}/activity` | Who attached when, who holds control |
+| `POST /api/machines/{id}/lease` | Acquire, renew or release |
+| `POST /api/machines/{id}/power` | Start, stop or restart |
+| `GET /api/activity` | The activity of every machine |
+| `GET /api/config` | The settings the browser application needs |
 | `GET /ws/console/{id}` | Binary RFB, proxied to the VNC port |
 | `GET /ws/serial/{id}` | Serial stream from the broker, scrollback first |
-| `POST /api/machines/{id}/lease` | Acquire, renew or release |
+| `GET /ws/logs/{id}` | Journal tail |
+| `GET /healthz` | Liveness, and the inventory files that did not load |
+| `GET /` | The browser application |
+
+This table is the list. A reader who wants to know what labview serves reads
+it here and nowhere else.
 
 The serial endpoint takes `?write=1` to request the lease at attach time,
 which is what a harness wants. Without it, attach is read-only.
@@ -136,6 +153,7 @@ name: el9-build
 host: kvm01
 vnc: 10.20.0.11:5901
 serial: /run/qemu/el9-build-serial.sock
+unit: qemu-el9-build.service
 notes: AlmaLinux 9
 ```
 
@@ -146,12 +164,33 @@ in the path. The file name is the only source of the `id`, so two machines
 cannot claim one id, and a file must not set `id` itself.
 
 labview watches the directory. A new file, a changed file and a deleted file
-all reach the wall at once. A periodic scan runs as well, because a watch
-can be lost.
+all reach the wall at once. It also reads the directory again every
+`-inventory-rescan`, as a backstop for a watch the filesystem does not
+deliver.
 
-The unit of failure is the file. A file that does not parse keeps the entry
-that last parsed, and the other machines are untouched. A typo takes down
-one machine at most, and a half-written file takes down nothing.
+`.yaml` and `.yml` both count. Anything else in the directory is ignored: a
+README, an editor's backup, a dot file a writer has not finished with.
+
+The unit of failure is the file. A file that does not parse is logged and
+keeps the entry that last parsed, and the other machines are untouched. A
+typo takes down one machine at most, and a half-written file takes down
+nothing. `/healthz` names the files that did not load.
+
+The first load is strict. labview does not start with a file it cannot read,
+because a wall that is quietly missing a machine is worse than one that does
+not come up.
+
+The file name is the id, and nothing else is. It becomes a path element and a
+capture filename, so it is validated at load: letters, digits, dot,
+underscore and hyphen, starting with a letter or digit.
+
+`unit` names the systemd unit of the machine. It is an allowlist rather than
+a convenience: a machine with no `unit` has no power operations, and labview
+does not guess a unit name from an id. Section 12 requires the inventory to
+be the id-to-unit mapping.
+
+Unknown settings are kept and shown verbatim on the details tab, so a
+producer newer than labview does not break the load.
 
 `serial` is a unix socket path when labview runs on the hypervisor, or
 `host:port` when it doesn't. Either is a `net.Dial`, so the broker does not
@@ -245,6 +284,13 @@ expiry turns out to be too slow in practice.
 **Recording and replay of framebuffer sessions.** Serial transcripts give
 most of the forensic value at a fraction of the cost.
 
+**The screenshot tile.** The tile is a component with a pluggable renderer,
+and `-tile-mode=screenshot` selects the other one, as section 7 asks. There
+is no capture source behind it. A server-side screenshot means either QMP
+screendump, which section 12 ruled out in favour of systemd, or decoding RFB
+in the server. Neither is settled, so the renderer says what it waits for
+rather than inventing an endpoint.
+
 ---
 
 ## 10. Deployment and trust
@@ -255,6 +301,29 @@ working. The asserted identity arrives in `X-Forwarded-User` and is used for
 two things: naming the lease holder in the UI, and logging who attached to
 what. It is not an authorisation input — everyone who gets past the proxy
 can see every machine.
+
+`deploy/` holds the three pieces this section and section 12 describe.
+
+| File | What it is |
+|---|---|
+| `labview.service` | labview as its own user, not root, hardened |
+| `50-labview-units.rules` | polkit: unit management over just the lab's units |
+| `nginx-labview.conf` | TLS, SSO, and the headers labview depends on |
+
+Read the comments in `nginx-labview.conf` before writing another proxy
+configuration. Three details are easy to get wrong, and two of them fail in
+a way that looks like a labview bug.
+
+- The original `Host` header must be forwarded, or the websocket origin
+  check refuses every console.
+- `X-Forwarded-User` must be set on the websocket upgrade as well as on an
+  ordinary request. Set on plain HTTP only, every console and serial socket
+  is unidentified, so no lease matches the person holding it and nobody can
+  type.
+- A client-supplied `X-Forwarded-User` must be discarded. labview trusts the
+  header completely: it is the only thing that names the lease holder and the
+  only thing in the audit trail. A proxy that forwards the header a caller
+  sent lets that caller name themselves.
 
 VNC and serial endpoints are bound to the hypervisor's management address,
 or to a unix socket with labview running alongside. They are not reachable
@@ -295,6 +364,12 @@ as a backstop against a machine that spews.
 
 The broker owns the fd, so rotation happens in-process. Do not point
 logrotate at these files; copytruncate against a live writer loses data.
+
+asciicast stores output as JSON strings, which must be UTF-8, while a serial
+read can split a multi-byte character. The capture holds back a trailing
+partial character to rejoin it with the next chunk, and it replaces only
+genuinely invalid bytes. The websocket path does no such thing: it forwards
+raw bytes and lets the browser decode incrementally.
 
 ### You can attach to a machine that is not running yet
 
