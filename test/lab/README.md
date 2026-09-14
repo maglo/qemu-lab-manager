@@ -13,6 +13,10 @@ in a temp directory the run prints; set `SHOTS_DIR` to put them somewhere you
 choose. A machine that has a browser already can skip the download: point
 `CHROMIUM_PATH` at the executable.
 
+`01-wall.png` is the picture in the top level `README.md`. A change to the
+wall makes that picture wrong, so copy the new shot to `docs/images/wall.png`
+in the same branch.
+
 ## Why this exists
 
 Unit tests cover the broker, the lease, the RFB framing and the API. They

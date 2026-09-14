@@ -13,6 +13,13 @@ every machine at once. You click a machine to expand it and to take control.
 You attach to the serial line when a scenario needs it. One Go binary, one
 inventory directory, no database.
 
+![The labview wall. Four tiles side by side: a live framebuffer, a serial
+tail that shows a boot, a machine with neither channel, and a machine that is
+switched off.](docs/images/wall.png)
+
+The picture shows the fake lab of `test/lab`, so the screen is a test pattern
+and the boot is a script.
+
 This file tells you how to build labview and how to run it. It does not
 describe how labview works. Each document below is the one place that
 describes its subject.
