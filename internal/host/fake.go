@@ -25,8 +25,6 @@ type Fake struct {
 	PowerErr error
 	// InspectErr likewise.
 	InspectErr error
-	// LogLines is what Logs returns.
-	LogLines []LogLine
 }
 
 // NewFake returns fake host access with every machine stopped.
@@ -138,42 +136,6 @@ func (f *Fake) Power(_ context.Context, m inventory.Machine, op Op) error {
 	}
 	f.units[m.ID] = u
 	return nil
-}
-
-// Logs implements Access.
-func (f *Fake) Logs(_ context.Context, m inventory.Machine, _ LogOptions) ([]LogLine, error) {
-	if !m.CanPower() {
-		return nil, &ErrNoUnit{Machine: m.ID}
-	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.LogLines != nil {
-		return append([]LogLine(nil), f.LogLines...), nil
-	}
-	return []LogLine{{
-		At:       time.Now(),
-		Priority: 6,
-		Unit:     m.Unit,
-		Message:  "host access is faked; there is no journal to read",
-	}}, nil
-}
-
-// TailLogs implements Access. It replays Logs once and then waits for the
-// context, which is enough for the UI to render.
-func (f *Fake) TailLogs(ctx context.Context, m inventory.Machine) (<-chan LogLine, error) {
-	lines, err := f.Logs(ctx, m, LogOptions{})
-	if err != nil {
-		return nil, err
-	}
-	ch := make(chan LogLine, len(lines)+1)
-	for _, l := range lines {
-		ch <- l
-	}
-	go func() {
-		<-ctx.Done()
-		close(ch)
-	}()
-	return ch, nil
 }
 
 // Close implements Access.

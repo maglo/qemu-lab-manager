@@ -198,7 +198,7 @@ func newHostAccess(cfg config.Config, log *slog.Logger) (host.Access, error) {
 	case config.HostLocal:
 		return host.NewLocal(host.LocalOptions{Log: log}), nil
 	case config.HostFake:
-		log.Warn("host access is faked; details, logs and power operations are invented")
+		log.Warn("host access is faked; details and power operations are invented")
 		return host.NewFake(), nil
 	case config.HostNone:
 		return host.NewUnavailable(), nil

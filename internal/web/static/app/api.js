@@ -31,8 +31,6 @@ export const api = {
   config: () => json('/api/config'),
   machines: () => json('/api/machines'),
   machine: (id) => json(`/api/machines/${encodeURIComponent(id)}`),
-  logs: (id, lines = 200) =>
-    json(`/api/machines/${encodeURIComponent(id)}/logs?lines=${lines}`),
   recordings: (id) => json(`/api/machines/${encodeURIComponent(id)}/recordings`),
   activity: (id) => json(`/api/machines/${encodeURIComponent(id)}/activity`),
 
@@ -66,5 +64,4 @@ export const ws = {
     wsURL(`/ws/console/${encodeURIComponent(id)}${write ? '?write=1' : ''}`),
   serial: (id, write) =>
     wsURL(`/ws/serial/${encodeURIComponent(id)}${write ? '?write=1' : ''}`),
-  logs: (id) => wsURL(`/ws/logs/${encodeURIComponent(id)}`),
 };

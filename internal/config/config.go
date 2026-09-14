@@ -81,7 +81,6 @@ type Config struct {
 	HostAccess HostAccessMode
 
 	ActivityCapacity int
-	LogLines         int
 
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
@@ -118,7 +117,6 @@ func Default() Config {
 		HostAccess: HostLocal,
 
 		ActivityCapacity: 200,
-		LogLines:         200,
 
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
@@ -177,8 +175,6 @@ func Bind(fs *flag.FlagSet, c *Config) {
 		return fmt.Errorf("must be %q, %q or %q", HostLocal, HostNone, HostFake)
 	})
 
-	fs.IntVar(&c.LogLines, "log-lines", c.LogLines,
-		"journal lines returned by the logs tab")
 	fs.BoolVar(&c.Verbose, "verbose", c.Verbose, "log at debug level")
 }
 

@@ -348,7 +348,6 @@ func TestUnknownMachineIs404(t *testing.T) {
 	h := newHarness(t)
 	for _, path := range []string{
 		"/api/machines/nope",
-		"/api/machines/nope/logs",
 		"/api/machines/nope/recordings",
 		"/api/machines/nope/activity",
 	} {
@@ -610,27 +609,6 @@ func TestActivityRecordsWhoDidWhat(t *testing.T) {
 	// Newest first, so the tab reads as a history.
 	if len(body.Activity) > 1 && body.Activity[0].At.Before(body.Activity[1].At) {
 		t.Error("activity is not newest first")
-	}
-}
-
-func TestLogsForMachineWithoutUnit(t *testing.T) {
-	h := newHarness(t)
-	rec := h.do("GET", "/api/machines/no-unit/logs", "alice", nil)
-	if rec.Code != http.StatusNotImplemented {
-		t.Fatalf("status = %d, want 501: %s", rec.Code, rec.Body)
-	}
-	if !strings.Contains(rec.Body.String(), "no systemd unit") {
-		t.Errorf("unhelpful error: %s", rec.Body)
-	}
-}
-
-func TestLogsLineLimitIsBounded(t *testing.T) {
-	h := newHarness(t)
-	// A client asking for a million lines gets a bounded answer rather than
-	// the whole journal.
-	rec := h.do("GET", "/api/machines/el9-build/logs?lines=1000000", "alice", nil)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d: %s", rec.Code, rec.Body)
 	}
 }
 

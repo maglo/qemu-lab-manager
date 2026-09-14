@@ -1,4 +1,4 @@
-// The details, logs, recordings and activity tabs.
+// The details, recordings and activity tabs.
 //
 // The bias is toward showing everything the host already knows about a
 // machine; the constraint is keeping it organised enough to be worth reading
@@ -113,29 +113,6 @@ function groupArgs(args) {
 function shellQuote(arg) {
   if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(arg)) return arg;
   return `'${arg.replace(/'/g, `'\\''`)}'`;
-}
-
-export function renderLogs(host, lines, { note } = {}) {
-  clear(host);
-  if (note) {
-    host.append(el('p', { class: 'note warn', text: note }));
-    return;
-  }
-  if (!lines?.length) {
-    host.append(el('p', { class: 'empty', text: 'No journal entries.' }));
-    return;
-  }
-  for (const line of lines) host.append(logLine(line));
-}
-
-export function logLine(line) {
-  const t = line.at ? new Date(line.at) : null;
-  return el('div', { class: `logline p${line.priority ?? 6}` },
-    el('time', {
-      datetime: line.at || '',
-      text: t && !isNaN(t) ? t.toLocaleTimeString() : '',
-    }),
-    el('span', { class: 'msg', text: line.message || '' }));
 }
 
 export function renderRecordings(host, machineID, recordings, { note } = {}) {

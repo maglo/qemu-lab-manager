@@ -1,11 +1,10 @@
 # labview -- a console wall for the QEMU lab.
 #
-# labview runs as its own user, not root (design section 12). It needs three
+# labview runs as its own user, not root (design section 12). It needs two
 # things from the host and nothing else:
 #
 #   - read/write on the QEMU serial sockets, for the brokers
 #   - the system bus, to start, stop and restart units via systemd
-#   - the journal, for the logs tab
 #
 # Install to /etc/systemd/system/labview.service and adjust the paths and
 # the supplementary groups to match the lab.
@@ -27,8 +26,7 @@ ExecStart=/usr/local/bin/labview \
 User=labview
 Group=labview
 # qemu: to open the chardev sockets QEMU creates.
-# systemd-journal: to read the journal for the logs tab.
-SupplementaryGroups=qemu systemd-journal
+SupplementaryGroups=qemu
 
 Restart=on-failure
 RestartSec=2s

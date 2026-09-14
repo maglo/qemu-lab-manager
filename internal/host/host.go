@@ -2,8 +2,8 @@
 //
 // It exists because the design's channels split two ways: the framebuffer and
 // the serial line are dialable over the network, while the QEMU command line,
-// the unit state, the journal and power operations are local to the
-// hypervisor (design section 13, "Host access out").
+// the unit state and power operations are local to the hypervisor (design
+// section 13, "Host access out").
 //
 // Everything here is readable without libvirt and without an agent, which is
 // the point. The interface is also the seam that a future aggregating labview
@@ -113,19 +113,6 @@ type Details struct {
 	Warnings []string `json:"warnings,omitempty"`
 }
 
-// LogLine is one journal entry.
-type LogLine struct {
-	At       time.Time `json:"at"`
-	Priority int       `json:"priority"`
-	Message  string    `json:"message"`
-	Unit     string    `json:"unit,omitempty"`
-}
-
-// LogOptions bounds a journal read.
-type LogOptions struct {
-	Lines int // most recent N entries
-}
-
 // Access is labview's host-side introspection and control.
 //
 // Implementations must treat a machine as opaque: they receive the inventory
@@ -140,14 +127,6 @@ type Access interface {
 
 	// UnitState is the cheap subset of Inspect, for the machines listing.
 	UnitState(ctx context.Context, m inventory.Machine) (Unit, error)
-
-	// Logs returns recent journal entries for the machine's unit. A VM that
-	// failed to start has its reason here and nowhere else (design
-	// section 8).
-	Logs(ctx context.Context, m inventory.Machine, opts LogOptions) ([]LogLine, error)
-
-	// TailLogs streams journal entries until the context is cancelled.
-	TailLogs(ctx context.Context, m inventory.Machine) (<-chan LogLine, error)
 
 	// Power performs a power operation. The caller has already checked the
 	// write lease; this call does not know about leases.

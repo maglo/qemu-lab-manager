@@ -204,32 +204,6 @@ func redactedEntry(m inventory.Machine) map[string]any {
 	return entry
 }
 
-// handleLogs serves recent journal lines for a machine's unit.
-func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
-	m, ok := s.machine(w, r)
-	if !ok {
-		return
-	}
-	n := intParam(r, "lines", s.cfg.LogLines, 1, 5000)
-
-	lines, err := s.hosts.Logs(r.Context(), m, host.LogOptions{Lines: n})
-	switch {
-	case noUnit(err):
-		writeError(w, http.StatusNotImplemented, "%s", err.Error())
-		return
-	case hostUnavailable(err):
-		writeError(w, http.StatusNotImplemented, "%s", err.Error())
-		return
-	case err != nil:
-		writeError(w, http.StatusBadGateway, "reading the journal failed: %s", err.Error())
-		return
-	}
-	if lines == nil {
-		lines = []host.LogLine{}
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"lines": lines})
-}
-
 // handleRecordings lists a machine's past serial captures.
 func (s *Server) handleRecordings(w http.ResponseWriter, r *http.Request) {
 	m, ok := s.machine(w, r)

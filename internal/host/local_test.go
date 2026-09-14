@@ -160,9 +160,6 @@ func TestUnitStateAndPowerRefuseWithoutUnit(t *testing.T) {
 	if err := l.Power(context.Background(), m, OpRestart); !asErrNoUnit(err, &noUnit) {
 		t.Errorf("Power error = %v, want ErrNoUnit", err)
 	}
-	if _, err := l.Logs(context.Background(), m, LogOptions{}); !asErrNoUnit(err, &noUnit) {
-		t.Errorf("Logs error = %v, want ErrNoUnit", err)
-	}
 }
 
 func TestPowerRejectsUnknownOperation(t *testing.T) {
@@ -189,74 +186,6 @@ func TestOpValid(t *testing.T) {
 		if Op(op).Valid() {
 			t.Errorf("%q should be rejected", op)
 		}
-	}
-}
-
-// The unit name reaches journalctl as its own argv element, never as part of
-// a command string.
-func TestJournalArgsPassUnitAsSeparateArgument(t *testing.T) {
-	args := journalArgs("qemu-el9.service", LogOptions{Lines: 50}, false)
-
-	idx := -1
-	for i, a := range args {
-		if a == "--unit" {
-			idx = i
-		}
-	}
-	if idx < 0 || idx+1 >= len(args) {
-		t.Fatalf("no --unit in %q", args)
-	}
-	if args[idx+1] != "qemu-el9.service" {
-		t.Errorf("unit argument = %q", args[idx+1])
-	}
-	if !contains(args, "--lines") || !contains(args, "50") {
-		t.Errorf("line limit missing from %q", args)
-	}
-	if contains(args, "--follow") {
-		t.Errorf("non-following read asked to follow: %q", args)
-	}
-	if got := journalArgs("u.service", LogOptions{}, true); !contains(got, "--follow") {
-		t.Errorf("following read did not ask to follow: %q", got)
-	}
-	// Default line count, so a tab never asks for the whole journal.
-	if got := journalArgs("u.service", LogOptions{}, false); !contains(got, "200") {
-		t.Errorf("no default line limit: %q", got)
-	}
-}
-
-func TestJournalMessageHandlesStringAndBinary(t *testing.T) {
-	if got := journalMessage("hello"); got != "hello" {
-		t.Errorf("string message = %q", got)
-	}
-	// journalctl renders non-UTF-8 messages as an array of byte values.
-	if got := journalMessage([]any{float64(104), float64(105)}); got != "hi" {
-		t.Errorf("binary message = %q", got)
-	}
-	if got := journalMessage(nil); got != "" {
-		t.Errorf("nil message = %q", got)
-	}
-	if got := journalMessage(42); got != "" {
-		t.Errorf("unexpected type = %q", got)
-	}
-}
-
-func TestJournalEntryToLine(t *testing.T) {
-	e := journalEntry{
-		Message:   "started",
-		Priority:  "3",
-		Timestamp: "1789574400000000",
-		Unit:      "qemu-el9.service",
-	}
-	l := e.toLine()
-	if l.Message != "started" || l.Priority != 3 || l.Unit != "qemu-el9.service" {
-		t.Fatalf("line = %+v", l)
-	}
-	if l.At.IsZero() {
-		t.Error("timestamp not parsed")
-	}
-	// A missing priority must default to informational, not zero (emerg).
-	if got := (journalEntry{Message: "x"}).toLine(); got.Priority != 6 {
-		t.Errorf("default priority = %d, want 6", got.Priority)
 	}
 }
 
@@ -289,13 +218,4 @@ func asErrNoUnit(err error, target **ErrNoUnit) bool {
 		*target = e
 	}
 	return ok
-}
-
-func contains(ss []string, want string) bool {
-	for _, s := range ss {
-		if s == want {
-			return true
-		}
-	}
-	return false
 }

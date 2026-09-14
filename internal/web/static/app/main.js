@@ -7,7 +7,7 @@
 import { api } from './api.js';
 import { Tile } from './tile.js';
 import { SerialView } from './serial.js';
-import { renderDetails, renderLogs, logLine, renderRecordings, renderActivity } from './tabs.js';
+import { renderDetails, renderRecordings, renderActivity } from './tabs.js';
 import { $, el, clear, toast, when } from './dom.js';
 
 const WALL_POLL_MS = 4000;
@@ -20,7 +20,6 @@ const state = {
   tab: 'console',
   record: null,      // last fetched whole record for the open machine
   serial: null,      // SerialView for the expanded serial tab
-  logsSocket: null,
   haveControl: false,
   pollTimer: null,
 };
@@ -51,7 +50,7 @@ async function start() {
 // --- routing ----------------------------------------------------------
 //
 // The hash carries the state so a developer can link a colleague straight to
-// a machine's logs.
+// a machine and the tab that shows what they mean.
 
 function applyRoute() {
   const hash = location.hash.replace(/^#\/?/, '');
@@ -191,7 +190,6 @@ function closeMachine() {
     state.serial.destroy();
     state.serial = null;
   }
-  closeLogsSocket();
   clear($('#console-host'));
 }
 
@@ -247,7 +245,6 @@ const ALL_TABS = [
   ['console', 'Console'],
   ['serial', 'Serial'],
   ['details', 'Details'],
-  ['logs', 'Logs'],
   ['recordings', 'Recordings'],
   ['activity', 'Activity'],
 ];
@@ -287,7 +284,6 @@ function selectTab(tab) {
     if (state.haveControl) state.tiles.get(state.open)?.focus();
   }
   if (tab === 'serial') openSerial();
-  if (tab === 'logs') openLogs();
   if (tab === 'recordings') loadRecordings();
 }
 
@@ -350,50 +346,6 @@ function paintSerialStatus(msg) {
   }
   // A lease change on this machine changes what the buttons should offer.
   if (msg.type === 'control') refreshWall();
-}
-
-// --- logs tab ---------------------------------------------------------
-
-function openLogs() {
-  const summary = state.summaries.get(state.open);
-  const host = $('#logs');
-  if (!summary?.canPower) {
-    renderLogs(host, null, {
-      note: 'This machine has no systemd unit in the inventory, so it has no journal to tail.',
-    });
-    return;
-  }
-  if (state.logsSocket) return;
-
-  clear(host);
-  const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/logs/${encodeURIComponent(summary.id)}`);
-  state.logsSocket = socket;
-
-  socket.onmessage = (ev) => {
-    let line;
-    try {
-      line = JSON.parse(ev.data);
-    } catch {
-      return;
-    }
-    if (line.type === 'error') {
-      host.append(el('p', { class: 'note bad', text: line.message }));
-      return;
-    }
-    const atBottom = host.scrollHeight - host.scrollTop - host.clientHeight < 40;
-    host.append(logLine(line));
-    // Follow the tail unless the reader has scrolled up to look at
-    // something.
-    if (atBottom) host.scrollTop = host.scrollHeight;
-  };
-  socket.onclose = () => { state.logsSocket = null; };
-}
-
-function closeLogsSocket() {
-  if (state.logsSocket) {
-    state.logsSocket.close();
-    state.logsSocket = null;
-  }
 }
 
 // --- recordings tab ---------------------------------------------------

@@ -115,8 +115,8 @@ async function tileCount(page, want) {
   check((await page.textContent('#title')) === 'el9-build', 'header names the machine');
 
   const tabs = await page.$$eval('#tabs button', (bs) => bs.map((b) => b.dataset.tab));
-  check(JSON.stringify(tabs) === JSON.stringify(['console','serial','details','logs','recordings','activity']),
-    `all six tabs present (got ${tabs.join(',')})`);
+  check(JSON.stringify(tabs) === JSON.stringify(['console','serial','details','recordings','activity']),
+    `all five tabs present (got ${tabs.join(',')})`);
   check(await page.getAttribute('#tabs button[data-tab="console"]', 'aria-selected') === 'true',
     'console is the default tab');
   await onlyPanelVisible(page, 'console');
@@ -180,21 +180,13 @@ async function tileCount(page, want) {
   check(copyButtons.length >= 2, `copy buttons on every block (got ${copyButtons.length})`);
   await page.screenshot({ path: `${OUT}/05-details.png`, fullPage: true });
 
-  // --- logs ---
-  await page.click('#tabs button[data-tab="logs"]');
-  await page.waitForTimeout(1500);
-  await onlyPanelVisible(page, 'logs');
-  const logs = await page.textContent('#logs');
-  check(logs.trim().length > 0, 'logs tab renders journal lines');
-  await page.screenshot({ path: `${OUT}/06-logs.png` });
-
   // --- recordings ---
   await page.click('#tabs button[data-tab="recordings"]');
   await page.waitForTimeout(1200);
   await onlyPanelVisible(page, 'recordings');
   const recs = await page.textContent('#recordings');
   check(/download|capture/i.test(recs), 'recordings tab lists captures');
-  await page.screenshot({ path: `${OUT}/07-recordings.png` });
+  await page.screenshot({ path: `${OUT}/06-recordings.png` });
 
   // --- activity ---
   await page.click('#tabs button[data-tab="activity"]');
@@ -203,7 +195,7 @@ async function tileCount(page, want) {
   const act = await page.textContent('#activity');
   check(/alice@example\.com/.test(act), 'activity names who did what');
   check(/control-granted|attach/.test(act), 'activity records the control grant');
-  await page.screenshot({ path: `${OUT}/08-activity.png` });
+  await page.screenshot({ path: `${OUT}/07-activity.png` });
 
   // --- serial-only machine opens on serial ---
   await page.click('#back');
@@ -214,14 +206,14 @@ async function tileCount(page, want) {
   check(!soTabs.includes('console'), 'a machine with no framebuffer has no console tab');
   check(await page.getAttribute('#tabs button[data-tab="serial"]', 'aria-selected') === 'true',
     'serial-only machine opens on the serial tab');
-  await page.screenshot({ path: `${OUT}/09-serial-only.png` });
+  await page.screenshot({ path: `${OUT}/08-serial-only.png` });
 
   // --- back to the wall: the session returned to its tile ---
   await page.click('#back');
   await page.waitForTimeout(1500);
   check(await page.isVisible('#wall'), 'back returns to the wall');
   check((await page.$$('.tile canvas')).length >= 1, 'the framebuffer session went back to its tile');
-  await page.screenshot({ path: `${OUT}/10-wall-after.png` });
+  await page.screenshot({ path: `${OUT}/09-wall-after.png` });
 
   // --- a machine file appears and goes, with labview left running ---
   const invDir = process.env.INVENTORY_DIR;
@@ -229,7 +221,7 @@ async function tileCount(page, want) {
   fs.writeFileSync(newFile, 'name: late-arrival\nhost: kvm03\nnotes: Written while labview runs\n');
   const arrived = await tileCount(page, 5);
   check(arrived, 'a new machine file reaches the wall without a restart');
-  await page.screenshot({ path: `${OUT}/11-wall-new-machine.png` });
+  await page.screenshot({ path: `${OUT}/10-wall-new-machine.png` });
 
   fs.unlinkSync(newFile);
   check(await tileCount(page, 4), 'a deleted machine file leaves the wall');
