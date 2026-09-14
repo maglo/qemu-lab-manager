@@ -1,0 +1,5 @@
+---
+trivial:
+  - "release - the notes of a release name the container image and give the
+    pull command for that version
+    (https://github.com/maglo/qemu-lab-manager/issues/32)."

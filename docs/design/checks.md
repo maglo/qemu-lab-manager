@@ -84,6 +84,11 @@ It reads the notes of that version first. A tag that runs ahead of the
 release pull request names a version that `changelogs/changelog.yaml` does
 not hold, and the job fails there, before it creates a release with no notes.
 
+The job adds one section to the notes: the command that pulls the image of
+this release. The release page is where a reader looks for a release, so the
+page names the registry. The job derives the image name from the repository,
+as `ci.yml` does, so one name cannot drift from the other.
+
 `ci.yml` runs on the tag as well, so the image carries the version.
 [`changelog.md`](changelog.md) gives the release process.
 
