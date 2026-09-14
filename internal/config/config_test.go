@@ -36,6 +36,8 @@ func TestBindParsesFlags(t *testing.T) {
 		"-tile-mode", "screenshot",
 		"-host-access", "fake",
 		"-recordings-dir", "/tmp/casts",
+		"-screenshot-dir", "/tmp/shots",
+		"-screenshot-interval", "2s",
 	})
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
@@ -55,6 +57,9 @@ func TestBindParsesFlags(t *testing.T) {
 	}
 	if c.HostAccess != HostFake {
 		t.Errorf("HostAccess = %q", c.HostAccess)
+	}
+	if c.CaptureDir != "/tmp/shots" || c.CaptureInterval != 2*time.Second {
+		t.Errorf("capture settings = %q every %s", c.CaptureDir, c.CaptureInterval)
 	}
 }
 
@@ -82,6 +87,8 @@ func TestValidateCatchesBadCombinations(t *testing.T) {
 		"zero lease":             func(c *Config) { c.LeaseIdle = 0 },
 		"warning outlasts lease": func(c *Config) { c.LeaseWarn = c.LeaseIdle },
 		"zero scrollback":        func(c *Config) { c.RingBytes = 0 },
+		"zero screenshot rate":   func(c *Config) { c.CaptureInterval = 0 },
+		"zero control timeout":   func(c *Config) { c.ControlTimeout = 0 },
 	}
 	for name, mutate := range cases {
 		c := Default()

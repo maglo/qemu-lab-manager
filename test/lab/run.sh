@@ -37,6 +37,7 @@ cleanup() {
     echo "=== labview log ==="; tail -40 "$work/labview.log" 2>/dev/null
     echo "=== proxy log ===";   tail -20 "$work/proxy.log" 2>/dev/null
     echo "=== fake vnc log ==="; tail -20 "$work/vnc.log" 2>/dev/null
+    echo "=== fake qmp log ==="; tail -20 "$work/qmp.log" 2>/dev/null
   fi
   rm -rf "$LAB_DIR"
   return $code
@@ -54,6 +55,8 @@ python3 "$here/fakeserial.py" "$LAB_DIR/el9-build.sock"  >"$work/serial1.log" 2>
 pids+=($!)
 python3 "$here/fakeserial.py" "$LAB_DIR/serial-only.sock" >"$work/serial2.log" 2>&1 &
 pids+=($!)
+python3 "$here/fakeqmp.py" "$LAB_DIR/el9-build-qmp.sock"  >"$work/qmp.log" 2>&1 &
+pids+=($!)
 sleep 1
 
 # The fixture is copied, because the driver adds a machine file and deletes
@@ -62,11 +65,13 @@ export INVENTORY_DIR=$work/inventory.d
 cp -r "$here/machines" "$INVENTORY_DIR"
 
 echo "== starting labview on 127.0.0.1:$PORT"
+mkdir -p "$work/screenshots"
 "$work/labview" \
   -listen "127.0.0.1:$PORT" \
   -inventory "$INVENTORY_DIR" \
   -host-access fake \
   -recordings-dir "$work/recordings" \
+  -screenshot-dir "$work/screenshots" \
   >"$work/labview.log" 2>&1 &
 pids+=($!)
 

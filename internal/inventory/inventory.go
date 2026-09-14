@@ -33,22 +33,23 @@ var unitPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9:._\\@-]*\.(service|
 
 // Machine is one file of the inventory directory.
 //
-// VNC and Serial are deliberately unexported in the wire sense: see View,
-// which is what reaches the browser. Clients name a machine by ID only, so a
-// developer cannot ask labview to dial an address the inventory did not give
-// it (design section 6).
+// VNC, Serial and Control are deliberately unexported in the wire sense: see
+// View, which is what reaches the browser. Clients name a machine by ID only,
+// so a developer cannot ask labview to dial an address the inventory did not
+// give it (design section 6).
 type Machine struct {
 	// ID comes from the file name, not from the file. One machine is one
 	// file, so the name on disk is the name in the API, and two machines
 	// cannot claim the same id.
 	ID string `yaml:"-"`
 
-	Name   string `yaml:"name"`
-	Host   string `yaml:"host"`
-	VNC    string `yaml:"vnc"`
-	Serial string `yaml:"serial"`
-	Unit   string `yaml:"unit"`
-	Notes  string `yaml:"notes"`
+	Name    string `yaml:"name"`
+	Host    string `yaml:"host"`
+	VNC     string `yaml:"vnc"`
+	Serial  string `yaml:"serial"`
+	Control string `yaml:"control"`
+	Unit    string `yaml:"unit"`
+	Notes   string `yaml:"notes"`
 
 	// Entry is the file as written. The details tab shows it verbatim
 	// (design section 8), which means round tripping through this struct is
@@ -74,6 +75,10 @@ func (m Machine) HasConsole() bool { return m.VNC != "" }
 // HasSerial reports whether a serial broker should exist for this machine.
 func (m Machine) HasSerial() bool { return m.Serial != "" }
 
+// HasControl reports whether this machine has a QMP socket. It carries input
+// and screen capture; power still goes through systemd (design section 12).
+func (m Machine) HasControl() bool { return m.Control != "" }
+
 // CanPower reports whether power operations are available. The inventory is
 // the allowlist (design section 12): no unit in the file means labview has no
 // business touching this machine's lifecycle, so the API refuses rather than
@@ -91,8 +96,17 @@ func (m Machine) SerialNetwork() string {
 	return "tcp"
 }
 
+// ControlNetwork classifies the control address so a QMP client can
+// net.Dial it, exactly as SerialNetwork does for the serial line.
+func (m Machine) ControlNetwork() string {
+	if strings.HasPrefix(m.Control, "/") {
+		return "unix"
+	}
+	return "tcp"
+}
+
 // View is the browser-facing projection of a machine. It exists so that
-// omitting vnc and serial is a property of the type rather than a discipline
+// omitting the addresses is a property of the type rather than a discipline
 // applied at each handler.
 type View struct {
 	ID         string `json:"id"`
@@ -101,6 +115,7 @@ type View struct {
 	Notes      string `json:"notes"`
 	HasConsole bool   `json:"hasConsole"`
 	HasSerial  bool   `json:"hasSerial"`
+	HasControl bool   `json:"hasControl"`
 	CanPower   bool   `json:"canPower"`
 }
 
@@ -114,6 +129,7 @@ func (m Machine) View() View {
 		Notes:      m.Notes,
 		HasConsole: m.HasConsole(),
 		HasSerial:  m.HasSerial(),
+		HasControl: m.HasControl(),
 		CanPower:   m.CanPower(),
 	}
 }
@@ -276,6 +292,9 @@ func validate(m Machine) error {
 	}
 	if m.Serial != "" && m.SerialNetwork() == "tcp" && !strings.Contains(m.Serial, ":") {
 		return fmt.Errorf("serial %q must be a unix path or host:port", m.Serial)
+	}
+	if m.Control != "" && m.ControlNetwork() == "tcp" && !strings.Contains(m.Control, ":") {
+		return fmt.Errorf("control %q must be a unix path or host:port", m.Control)
 	}
 	if m.VNC != "" && !strings.Contains(m.VNC, ":") {
 		return fmt.Errorf("vnc %q must be host:port", m.VNC)

@@ -1,10 +1,16 @@
 # labview -- a console wall for the QEMU lab.
 #
-# labview runs as its own user, not root (design section 12). It needs two
+# labview runs as its own user, not root (design section 12). It needs three
 # things from the host and nothing else:
 #
-#   - read/write on the QEMU serial sockets, for the brokers
+#   - read/write on the QEMU serial and QMP sockets
 #   - the system bus, to start, stop and restart units via systemd
+#   - a directory it shares with QEMU, for screenshots
+#
+# Create that directory before the first start. QEMU writes the capture as
+# its own user, and labview reads it and removes it again:
+#
+#   install -d -o labview -g qemu -m 2770 /var/lib/labview/screenshots
 #
 # Install to /etc/systemd/system/labview.service and adjust the paths and
 # the supplementary groups to match the lab.
@@ -21,11 +27,13 @@ ExecStart=/usr/local/bin/labview \
     -listen 127.0.0.1:8080 \
     -inventory /etc/labview/inventory.d \
     -recordings-dir /var/lib/labview/recordings \
+    -screenshot-dir /var/lib/labview/screenshots \
     -host-access local
 
 User=labview
 Group=labview
-# qemu: to open the chardev sockets QEMU creates.
+# qemu: to open the sockets QEMU creates, and to write the screenshot
+# directory that QEMU shares.
 SupplementaryGroups=qemu
 
 Restart=on-failure
@@ -39,8 +47,10 @@ LimitNOFILE=8192
 KillSignal=SIGTERM
 TimeoutStopSec=15s
 
-# Hardening. labview reads /proc for QEMU command lines and writes only its
-# recordings directory, so almost everything else can be closed off.
+# Hardening. labview reads /proc for QEMU command lines and writes only under
+# /var/lib/labview, so almost everything else can be closed off. PrivateTmp is
+# why the screenshot directory is there and not in /tmp: QEMU writes the
+# capture, and it does not see labview's /tmp.
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

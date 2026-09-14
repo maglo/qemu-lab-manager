@@ -1,0 +1,9 @@
+---
+minor_changes:
+  - "inventory - a machine file takes ``control:``, the QMP socket of the machine. A path is a unix socket and ``host:port`` is a TCP port, exactly as ``serial:`` is classified (https://github.com/maglo/qemu-lab-manager/issues/35)."
+  - "api - ``POST /api/machines/{id}/keys`` sends one key chord over the control socket. It takes the write lease, the same one that gates the framebuffer and the serial line, and the chord extends that lease (https://github.com/maglo/qemu-lab-manager/issues/35)."
+  - "api - ``GET /api/machines/{id}/screenshot`` answers with one frame of the screen as PNG. It needs no lease, because the wall shows that screen to every viewer already (https://github.com/maglo/qemu-lab-manager/issues/35)."
+  - "api - the machine listing reports ``hasControl``, so a client knows which machines have a control socket (https://github.com/maglo/qemu-lab-manager/issues/35)."
+  - "deploy - the systemd unit passes ``-screenshot-dir`` and says how to create that directory. QEMU writes the capture as its own user, so labview shares the directory with QEMU (https://github.com/maglo/qemu-lab-manager/issues/35)."
+security_fixes:
+  - "api - ``control`` joins ``vnc`` and ``serial`` in the withheld set of the details tab. The tab shows every other field of the inventory entry verbatim, so a producer that writes ``control:`` would otherwise publish the QMP socket path to every viewer (https://github.com/maglo/qemu-lab-manager/issues/35)."

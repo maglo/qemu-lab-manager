@@ -19,6 +19,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/host"
 	"github.com/maglo/qemu-lab-manager/labview/internal/inventory"
 	"github.com/maglo/qemu-lab-manager/labview/internal/lease"
+	"github.com/maglo/qemu-lab-manager/labview/internal/qmp"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
 )
 
@@ -29,6 +30,7 @@ type Server struct {
 	brokers   *serial.Manager
 	leases    *lease.Manager
 	hosts     host.Access
+	control   *qmp.Manager
 	activity  *activity.Log
 	log       *slog.Logger
 
@@ -43,8 +45,12 @@ type Deps struct {
 	Brokers   *serial.Manager
 	Leases    *lease.Manager
 	Hosts     host.Access
-	Activity  *activity.Log
-	Log       *slog.Logger
+	// Control runs QMP commands on the machines that have a control
+	// socket. Nil builds one from the configuration.
+	Control *qmp.Manager
+
+	Activity *activity.Log
+	Log      *slog.Logger
 
 	// UI serves the browser application. Nil serves the API only, which is
 	// all a harness needs.
@@ -57,12 +63,20 @@ func New(d Deps) *Server {
 	if log == nil {
 		log = slog.Default()
 	}
+	control := d.Control
+	if control == nil {
+		control = qmp.NewManager(qmp.Options{
+			CaptureDir: d.Config.CaptureDir,
+			Timeout:    d.Config.ControlTimeout,
+		})
+	}
 	s := &Server{
 		cfg:       d.Config,
 		inventory: d.Inventory,
 		brokers:   d.Brokers,
 		leases:    d.Leases,
 		hosts:     d.Hosts,
+		control:   control,
 		activity:  d.Activity,
 		log:       log,
 		mux:       http.NewServeMux(),
@@ -82,6 +96,8 @@ func (s *Server) routes() {
 
 	// The tabs of section 8, each also reachable as JSON.
 	s.mux.HandleFunc("POST /api/machines/{id}/power", s.handlePower)
+	s.mux.HandleFunc("POST /api/machines/{id}/keys", s.handleKeys)
+	s.mux.HandleFunc("GET /api/machines/{id}/screenshot", s.handleScreenshot)
 	s.mux.HandleFunc("GET /api/machines/{id}/recordings", s.handleRecordings)
 	s.mux.HandleFunc("GET /api/machines/{id}/recordings/{name}", s.handleRecording)
 	s.mux.HandleFunc("GET /api/machines/{id}/activity", s.handleActivity)

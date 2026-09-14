@@ -80,6 +80,16 @@ type Config struct {
 	TileMode   TileMode
 	HostAccess HostAccessMode
 
+	// CaptureDir is where QEMU writes a screenshot and labview reads it
+	// again. QEMU writes the file as its own user, so the directory is
+	// shared with QEMU rather than private to labview. Empty disables
+	// screen capture.
+	CaptureDir string
+	// CaptureInterval is how often a screenshot tile asks for a new frame.
+	CaptureInterval time.Duration
+	// ControlTimeout bounds one exchange on a control socket.
+	ControlTimeout time.Duration
+
 	ActivityCapacity int
 
 	ReadTimeout  time.Duration
@@ -115,6 +125,10 @@ func Default() Config {
 
 		TileMode:   TileRFB,
 		HostAccess: HostLocal,
+
+		CaptureDir:      "/var/lib/labview/screenshots",
+		CaptureInterval: 5 * time.Second,
+		ControlTimeout:  5 * time.Second,
 
 		ActivityCapacity: 200,
 
@@ -158,6 +172,13 @@ func Bind(fs *flag.FlagSet, c *Config) {
 	fs.Int64Var(&c.TranscriptMaxRunSize, "recordings-max-run-bytes", c.TranscriptMaxRunSize,
 		"size ceiling for a single capture, as a backstop against a machine that spews")
 
+	fs.StringVar(&c.CaptureDir, "screenshot-dir", c.CaptureDir,
+		"directory QEMU writes a screenshot to, shared with QEMU; empty disables capture")
+	fs.DurationVar(&c.CaptureInterval, "screenshot-interval", c.CaptureInterval,
+		"how often a screenshot tile asks for a new frame")
+	fs.DurationVar(&c.ControlTimeout, "control-timeout", c.ControlTimeout,
+		"how long to wait for an answer on a control socket")
+
 	fs.Func("tile-mode", "wall tile renderer: rfb or screenshot", func(v string) error {
 		switch TileMode(v) {
 		case TileRFB, TileScreenshot:
@@ -199,6 +220,12 @@ func (c Config) Validate() error {
 	if c.LeaseWarn >= c.LeaseIdle {
 		errs = append(errs, fmt.Errorf("lease warning (%s) must be shorter than the idle timeout (%s)",
 			c.LeaseWarn, c.LeaseIdle))
+	}
+	if c.CaptureInterval <= 0 {
+		errs = append(errs, errors.New("screenshot interval must be positive"))
+	}
+	if c.ControlTimeout <= 0 {
+		errs = append(errs, errors.New("control timeout must be positive"))
 	}
 	if c.RingBytes <= 0 {
 		errs = append(errs, errors.New("scrollback must be positive"))

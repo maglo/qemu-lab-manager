@@ -21,6 +21,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/host"
 	"github.com/maglo/qemu-lab-manager/labview/internal/inventory"
 	"github.com/maglo/qemu-lab-manager/labview/internal/lease"
+	"github.com/maglo/qemu-lab-manager/labview/internal/qmp"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
 )
 
@@ -31,6 +32,7 @@ var testInventory = map[string]string{
 host: kvm01
 vnc: 10.20.0.11:5901
 serial: /run/qemu/el9-build-serial.sock
+control: /run/qemu/el9-build-qmp.sock
 unit: qemu-el9-build.service
 notes: AlmaLinux 9
 tags:
@@ -52,6 +54,8 @@ type harness struct {
 	fakeHost *host.Fake
 	leases   *lease.Manager
 	brokers  *serial.Manager
+	qemu     *fakeQEMU
+	shotDir  string
 	dir      string
 	cancel   context.CancelFunc
 }
@@ -106,17 +110,26 @@ func newHarness(t *testing.T) *harness {
 	leases := lease.NewManager(lease.Options{IdleTimeout: cfg.LeaseIdle, WarnBefore: cfg.LeaseWarn})
 	fakeHost := host.NewFake()
 
+	shotDir := filepath.Join(dir, "screenshots")
+	if err := os.MkdirAll(shotDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	qemu := newFakeQEMU(t)
+	cfg.CaptureDir = shotDir
+
 	srv := New(Deps{
 		Config:    cfg,
 		Inventory: w,
 		Brokers:   brokers,
 		Leases:    leases,
 		Hosts:     fakeHost,
+		Control:   qmp.NewManager(qmp.Options{CaptureDir: shotDir, Dial: qemu.dial}),
 		Activity:  activity.New(50, log),
 		Log:       log,
 	})
 
-	h := &harness{srv: srv, fakeHost: fakeHost, leases: leases, brokers: brokers, dir: recDir, cancel: cancel}
+	h := &harness{srv: srv, fakeHost: fakeHost, leases: leases, brokers: brokers,
+		qemu: qemu, shotDir: shotDir, dir: recDir, cancel: cancel}
 	t.Cleanup(func() { cancel(); brokers.Close() })
 	return h
 }
@@ -210,7 +223,8 @@ func TestListingNeverCarriesAddresses(t *testing.T) {
 	})
 
 	addresses := []string{"10.20.0.11:5901", "10.20.0.12:5902",
-		"/run/qemu/el9-build-serial.sock", "/run/qemu/serial-only.sock"}
+		"/run/qemu/el9-build-serial.sock", "/run/qemu/serial-only.sock",
+		"/run/qemu/el9-build-qmp.sock"}
 
 	for _, path := range []string{
 		"/api/machines",
@@ -324,7 +338,7 @@ func TestMachineRecordShowsEntryVerbatimMinusAddresses(t *testing.T) {
 	}
 	// The addresses are present but redacted, so a reader does not wonder
 	// why the page differs from the file.
-	for _, k := range []string{"vnc", "serial"} {
+	for _, k := range []string{"vnc", "serial", "control"} {
 		v, present := body.Inventory[k]
 		if !present {
 			t.Errorf("%s vanished silently instead of being marked withheld", k)
