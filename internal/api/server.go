@@ -82,8 +82,6 @@ func (s *Server) routes() {
 
 	// The tabs of section 8, each also reachable as JSON.
 	s.mux.HandleFunc("POST /api/machines/{id}/power", s.handlePower)
-	s.mux.HandleFunc("GET /api/machines/{id}/logs", s.handleLogs)
-	s.mux.HandleFunc("GET /ws/logs/{id}", s.handleLogsWS)
 	s.mux.HandleFunc("GET /api/machines/{id}/recordings", s.handleRecordings)
 	s.mux.HandleFunc("GET /api/machines/{id}/recordings/{name}", s.handleRecording)
 	s.mux.HandleFunc("GET /api/machines/{id}/activity", s.handleActivity)

@@ -115,7 +115,6 @@ another, and neither gets a privileged path.
 |---|---|
 | `GET /api/machines` | Inventory plus liveness and current lease holder |
 | `GET /api/machines/{id}` | The whole record: details, disks, network, unit, recordings, activity |
-| `GET /api/machines/{id}/logs?lines=N` | Recent journal lines |
 | `GET /api/machines/{id}/recordings` | Past serial captures |
 | `GET /api/machines/{id}/recordings/{name}` | One capture, asciicast v2 |
 | `GET /api/machines/{id}/activity` | Who attached when, who holds control |
@@ -125,7 +124,6 @@ another, and neither gets a privileged path.
 | `GET /api/config` | The settings the browser application needs |
 | `GET /ws/console/{id}` | Binary RFB, proxied to the VNC port |
 | `GET /ws/serial/{id}` | Serial stream from the broker, scrollback first |
-| `GET /ws/logs/{id}` | Journal tail |
 | `GET /healthz` | Liveness, and the inventory files that did not load |
 | `GET /` | The browser application |
 
@@ -250,9 +248,14 @@ scrollable page:
 - Memory, vCPUs, machine type, firmware.
 - The machine's entry in the Ansible inventory, verbatim.
 
-**Logs** — recent journal lines for the unit, tailing live. A VM that failed
-to start has its reason here and nowhere else, which is the case where a
-developer currently has to SSH to the hypervisor.
+There is no logs tab. labview concerns itself with the VMs. A host's journal
+is host business, even when it is scoped to one unit. The serial transcript
+carries what a reader needs, and labview records it and replays it.
+
+The removal costs one case. A VM that fails to start never opens its serial
+socket, so its reason lives in the journal alone. labview shows that machine
+as inactive, and the developer reads the reason on the hypervisor. That is a
+deliberate trade, not an oversight.
 
 **Recordings** — past serial captures for this machine, one per run, with
 timestamps and sizes. Play in the browser or download.
@@ -271,8 +274,12 @@ Two rules that matter more than the list itself:
   appears in the UI that a harness cannot also fetch.
 
 Gathering this needs a small amount of host-side introspection — reading the
-unit, its cgroup, its command line, the journal. That is all readable from
-the hypervisor without libvirt and without an agent, which is the point.
+unit, its cgroup, its command line. That is all readable from the hypervisor
+without libvirt and without an agent, which is the point.
+
+`qemu-img` is the one program labview runs. Every other host interaction is a
+socket, a file read or a D-Bus call. Keep it that way. A new facility that
+wants a systemd tool needs a better reason than convenience.
 
 ---
 
@@ -473,8 +480,8 @@ producer will do — a playbook, a script, a person with an editor.
 
 **Host access out.** An internal interface, because the channels split two
 ways. Framebuffer and serial are dialable over the network. The QEMU command
-line, the unit state, the journal and power operations are not — they are
-local to the hypervisor.
+line, the unit state and power operations are not — they are local to the
+hypervisor.
 
 **API out.** HTTP and websockets as in §5, with everything the UI displays
 also available as JSON. The UI is one consumer, a test harness is another,

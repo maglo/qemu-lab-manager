@@ -11,8 +11,8 @@ import (
 //
 // The framebuffer and the serial line are dialable over the network, so the
 // wall and both consoles work exactly as they do on the hypervisor. The
-// command line, the unit state, the journal and power operations are local,
-// and this says so rather than guessing (design section 13).
+// command line, the unit state and power operations are local, and this says
+// so rather than guessing (design section 13).
 type Unavailable struct{}
 
 // NewUnavailable returns host access that reports every local-only facility
@@ -35,16 +35,6 @@ func (u *Unavailable) Inspect(_ context.Context, _ inventory.Machine) (Details, 
 // UnitState implements Access.
 func (u *Unavailable) UnitState(_ context.Context, _ inventory.Machine) (Unit, error) {
 	return Unit{}, u.why("unit state")
-}
-
-// Logs implements Access.
-func (u *Unavailable) Logs(_ context.Context, _ inventory.Machine, _ LogOptions) ([]LogLine, error) {
-	return nil, u.why("the journal")
-}
-
-// TailLogs implements Access.
-func (u *Unavailable) TailLogs(_ context.Context, _ inventory.Machine) (<-chan LogLine, error) {
-	return nil, u.why("the journal")
 }
 
 // Power implements Access.

@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -29,8 +28,6 @@ type LocalOptions struct {
 	// QEMUImgPath is the qemu-img binary used for disk sizes. Empty looks
 	// it up on PATH; disk sizes are simply omitted if it is absent.
 	QEMUImgPath string
-	// JournalctlPath likewise, for the logs tab.
-	JournalctlPath string
 
 	// ProcRoot and ArpFile are overridable for tests.
 	ProcRoot string
@@ -44,9 +41,8 @@ type LocalOptions struct {
 
 // Local reads and controls VMs on the hypervisor labview runs on.
 //
-// Nothing here needs libvirt or an in-guest agent: the unit, its cgroup, its
-// command line and the journal are all readable from the host (design
-// section 8).
+// Nothing here needs libvirt or an in-guest agent: the unit, its cgroup and
+// its command line are all readable from the host (design section 8).
 type Local struct {
 	opts LocalOptions
 	log  *slog.Logger
@@ -376,153 +372,6 @@ func readARP(path string) (map[string][]string, error) {
 		out[mac] = append(out[mac], ip)
 	}
 	return out, sc.Err()
-}
-
-// journalEntry is the subset of journalctl's JSON output that labview shows.
-type journalEntry struct {
-	Message   any    `json:"MESSAGE"`
-	Priority  string `json:"PRIORITY"`
-	Timestamp string `json:"__REALTIME_TIMESTAMP"`
-	Unit      string `json:"_SYSTEMD_UNIT"`
-}
-
-func (e journalEntry) toLine() LogLine {
-	l := LogLine{Priority: 6, Unit: e.Unit}
-	if p, err := strconv.Atoi(e.Priority); err == nil {
-		l.Priority = p
-	}
-	if usec, err := strconv.ParseInt(e.Timestamp, 10, 64); err == nil {
-		l.At = time.UnixMicro(usec)
-	}
-	l.Message = journalMessage(e.Message)
-	return l
-}
-
-// journalMessage normalises the MESSAGE field, which is a string for text
-// messages and an array of byte values for binary ones.
-func journalMessage(v any) string {
-	switch m := v.(type) {
-	case string:
-		return m
-	case []any:
-		b := make([]byte, 0, len(m))
-		for _, x := range m {
-			if f, ok := x.(float64); ok {
-				b = append(b, byte(int(f)))
-			}
-		}
-		return string(b)
-	default:
-		return ""
-	}
-}
-
-// journalArgs builds the argv for a journal read.
-//
-// This is the one place labview runs a systemd tool rather than using the bus:
-// there is no cgo-free reader for the journal's binary format. It is a read,
-// it is argv and never a shell string, and the unit name was validated when
-// the inventory was loaded -- so the objection in design section 12, that a
-// unit name interpolated into a command string is command execution waiting
-// to happen, does not apply.
-func journalArgs(unit string, opts LogOptions, follow bool) []string {
-	args := []string{"--unit", unit, "--output", "json", "--no-pager"}
-	if follow {
-		args = append(args, "--follow")
-	}
-	n := opts.Lines
-	if n <= 0 {
-		n = 200
-	}
-	return append(args, "--lines", strconv.Itoa(n))
-}
-
-func (l *Local) journalctl() (string, error) {
-	if l.opts.JournalctlPath != "" {
-		return l.opts.JournalctlPath, nil
-	}
-	bin, err := exec.LookPath("journalctl")
-	if err != nil {
-		return "", &ErrUnsupported{What: "journal", Why: "journalctl not found"}
-	}
-	return bin, nil
-}
-
-// Logs returns recent journal entries for a machine's unit.
-func (l *Local) Logs(ctx context.Context, m inventory.Machine, opts LogOptions) ([]LogLine, error) {
-	if !m.CanPower() {
-		return nil, &ErrNoUnit{Machine: m.ID}
-	}
-	bin, err := l.journalctl()
-	if err != nil {
-		return nil, err
-	}
-
-	cctx, cancel := context.WithTimeout(ctx, l.opts.CommandTimeout)
-	defer cancel()
-	out, err := exec.CommandContext(cctx, bin, journalArgs(m.Unit, opts, false)...).Output()
-	if err != nil {
-		return nil, fmt.Errorf("journalctl: %w", err)
-	}
-
-	var lines []LogLine
-	sc := bufio.NewScanner(strings.NewReader(string(out)))
-	sc.Buffer(make([]byte, 256<<10), 1<<20)
-	for sc.Scan() {
-		var e journalEntry
-		if err := json.Unmarshal(sc.Bytes(), &e); err != nil {
-			continue
-		}
-		lines = append(lines, e.toLine())
-	}
-	return lines, sc.Err()
-}
-
-// TailLogs streams journal entries until ctx is cancelled. A VM that failed
-// to start has its reason here and nowhere else, which is the case where a
-// developer currently has to SSH to the hypervisor (design section 8).
-func (l *Local) TailLogs(ctx context.Context, m inventory.Machine) (<-chan LogLine, error) {
-	if !m.CanPower() {
-		return nil, &ErrNoUnit{Machine: m.ID}
-	}
-	bin, err := l.journalctl()
-	if err != nil {
-		return nil, err
-	}
-
-	cmd := exec.CommandContext(ctx, bin, journalArgs(m.Unit, LogOptions{Lines: 200}, true)...)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("journalctl --follow: %w", err)
-	}
-
-	out := make(chan LogLine, 64)
-	go func() {
-		defer close(out)
-		defer func() {
-			// The context kills the process; reap it either way so a
-			// closed logs tab does not leave a zombie behind.
-			_ = cmd.Wait()
-		}()
-
-		sc := bufio.NewScanner(stdout)
-		sc.Buffer(make([]byte, 256<<10), 1<<20)
-		for sc.Scan() {
-			var e journalEntry
-			if err := json.Unmarshal(sc.Bytes(), &e); err != nil {
-				continue
-			}
-			select {
-			case out <- e.toLine():
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return out, nil
 }
 
 func firstLine(s string) string {

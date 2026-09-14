@@ -27,8 +27,8 @@ var idPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 
 // unitPattern constrains systemd unit names. Power operations go over D-Bus
 // and never through a shell (design section 12), so this is defence in depth
-// rather than quoting -- but the journal reader does exec journalctl, and a
-// unit name is the one inventory field that reaches it.
+// rather than quoting: a name that cannot be a unit is refused when the
+// inventory loads, not at each use site.
 var unitPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9:._\\@-]*\.(service|target|socket|scope)$`)
 
 // Machine is one file of the inventory directory.

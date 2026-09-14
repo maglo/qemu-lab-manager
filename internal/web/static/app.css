@@ -219,7 +219,7 @@ button.ghost { background: transparent; }
 .note.warn { color: var(--warn); }
 .note.bad { color: var(--bad); }
 
-/* --- Details, logs, recordings, activity ------------------------------ */
+/* --- Details, recordings, activity ------------------------------------ */
 
 .block { margin-bottom: 18px; }
 .block > h2 {
@@ -269,13 +269,6 @@ table.kv th, table.kv td {
 }
 table.kv th { color: var(--muted); font-weight: 500; width: 180px; white-space: nowrap; }
 table.kv td { font-family: var(--mono); font-size: 12px; word-break: break-word; }
-
-.logs { font-family: var(--mono); font-size: 12px; }
-.logline { display: flex; gap: 10px; padding: 1px 0; }
-.logline time { color: var(--muted); flex: 0 0 auto; }
-.logline .msg { white-space: pre-wrap; word-break: break-word; }
-.logline.p3 .msg, .logline.p2 .msg, .logline.p1 .msg, .logline.p0 .msg { color: var(--bad); }
-.logline.p4 .msg { color: var(--warn); }
 
 .rows { display: flex; flex-direction: column; gap: 1px; }
 .row {
