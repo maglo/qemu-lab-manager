@@ -11,8 +11,12 @@
 // which units that user may touch, so a mistake in the inventory cannot turn
 // into "restart anything on this hypervisor".
 //
-// ADJUST THE PATTERN to match the lab's unit naming before installing. The
-// pattern below assumes VM units are named qemu-<machine>.service.
+// The pattern below accepts both shapes that a lab uses in practice: the
+// plain form qemu-<machine>.service, and the systemd instance form
+// qemu-vm@<machine>.service, which is what maglo.qemu names its units.
+//
+// NARROW THE PATTERN to the lab's own unit naming before installing. A rule
+// that matches more units than the lab has is a wider grant than it needs.
 
 polkit.addRule(function (action, subject) {
     if (action.id !== "org.freedesktop.systemd1.manage-units") {
@@ -23,7 +27,7 @@ polkit.addRule(function (action, subject) {
     }
 
     var unit = action.lookup("unit");
-    if (!unit || !/^qemu-[A-Za-z0-9._-]+\.service$/.test(unit)) {
+    if (!unit || !/^qemu-[A-Za-z0-9._-]+(@[A-Za-z0-9._-]+)?\.service$/.test(unit)) {
         return polkit.Result.NOT_HANDLED;
     }
 
