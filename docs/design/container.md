@@ -96,17 +96,25 @@ This is the reason the unit stays the simpler deployment on a hypervisor.
 The image is `ghcr.io/maglo/qemu-lab-manager/labview`. The registry of the
 repository needs no second account and no second secret.
 
-| Tag | Meaning |
-|---|---|
-| `latest` | The head of `main`. |
-| `main` | The same image, named by branch. |
-| `sha-<short>` | One commit, for a deployment that pins. |
+Two events publish an image. A commit on `main` publishes the head of the
+branch, and a release tag publishes that release.
 
-`labview -version` prints the full commit of the image, because a tag can
-move and a commit cannot.
+| Tag | From | Meaning |
+|---|---|---|
+| `latest` | `main` | The head of `main`. |
+| `main` | `main` | The same image, named by branch. |
+| `sha-<short>` | both | One commit, for a deployment that pins. |
+| `0.1.0` | a tag | One release. |
+| `0.1` | a tag | The newest patch of that minor version. |
 
-A pull request builds the image and pushes nothing. The build is the check:
-a broken Dockerfile fails the pull request, and only `main` publishes.
+`labview -version` prints the version of the release for an image of a tag,
+and the full commit for every other image. A deployment that pins names a
+release or a commit, and neither moves.
+
+`docs/design/changelog.md` gives the steps that make a tag.
+
+A pull request builds the image and pushes nothing. The build is the check,
+so a broken Dockerfile fails the pull request before it reaches a registry.
 
 ---
 

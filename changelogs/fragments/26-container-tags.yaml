@@ -1,0 +1,4 @@
+---
+trivial:
+  - "container - the design document holds the tags that a release publishes
+    (https://github.com/maglo/qemu-lab-manager/issues/26)."
