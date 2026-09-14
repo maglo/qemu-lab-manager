@@ -6,7 +6,20 @@ GitHub Actions runs every check for each pull request. This document says
 what each workflow holds and why. `CLAUDE.md` holds the rules of the
 repository and points here; it does not repeat this list.
 
-## 2. `checks.yml`
+## 2. Run them before you push
+
+```sh
+go test -race ./...           # the Go tests
+test/lab/run.sh               # labview in a browser, against a fake lab
+./scripts/check-docs.sh       # the markdown rules
+./scripts/check-workflows.sh  # the gate of each workflow
+./scripts/check-changelog.sh  # the changelog fragments
+```
+
+`pull request rules` is not in the list. It reads the GitHub event payload,
+so it runs in CI only.
+
+## 3. `checks.yml`
 
 The checks of the repository itself. It runs on a pull request and on a push
 to `main`.
@@ -35,10 +48,7 @@ closes an issue, that issue has one type label, and the pull request adds a
 changelog fragment. A release pull request changes `CHANGELOG.md` and adds no
 fragment, so the check lets it pass.
 
-This job needs the GitHub event payload, so it runs in CI only. The other
-three run on a laptop.
-
-## 3. `ci.yml`
+## 4. `ci.yml`
 
 The Go code and the image. It runs on a pull request, on a push to `main` and
 on a `v*` tag.
@@ -62,7 +72,7 @@ A pull request builds the image and pushes nothing, so a broken `Dockerfile`
 fails the check before `main` gets an image from it.
 [`container.md`](container.md) gives the design of the image.
 
-## 4. `release.yml`
+## 5. `release.yml`
 
 A `v*` tag.
 
@@ -77,7 +87,7 @@ not hold, and the job fails there, before it creates a release with no notes.
 `ci.yml` runs on the tag as well, so the image carries the version.
 [`changelog.md`](changelog.md) gives the release process.
 
-## 5. The gate
+## 6. The gate
 
 Each workflow ends with one gate job: `checks passed`, `ci passed` and
 `release passed`. A gate depends on every other job of its workflow, and it
