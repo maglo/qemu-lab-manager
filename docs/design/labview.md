@@ -397,6 +397,29 @@ and nothing to escape.
 The graphical console stays pure binary. Its protocol has its own handshake
 and nothing may be injected into it.
 
+### The deployment is a systemd unit
+
+labview runs on the hypervisor as a systemd unit. There is no container
+image.
+
+Host access is local. labview reads the QEMU socket directory, the process
+list and the system bus, and it asks systemd to start and stop units. The
+targeted SELinux policy of Enterprise Linux denies `container_t` each one,
+and no boolean opens them. A container reaches them through `spc_t` and the
+process namespace of the host, and `spc_t` carries
+`unconfined_domain_type`. That is a wider boundary than a unit, not a
+narrower one.
+
+The unit gives the boundary instead. `ProtectSystem=strict`, `PrivateTmp`,
+`NoNewPrivileges`, a `CapabilityBoundingSet` and a scoped `ReadWritePaths`
+bound what labview reaches. The polkit rule of section 12 bounds the units
+it manages, and polkit matches the user name that the host sees.
+
+Packaging is the other half of the reason. The binary is static and the
+browser application is embedded, so an image carries one file and isolates
+no dependency. A release attaches that binary for Linux and macOS on both
+architectures.
+
 ---
 
 ## 12. Power operations

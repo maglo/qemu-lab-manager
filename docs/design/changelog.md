@@ -97,10 +97,10 @@ The notes come first. A tag that runs ahead of the release pull request names
 a version that `changelogs/changelog.yaml` does not hold, and the job fails
 there, before it creates a release that has no notes.
 
-`ci.yml` also runs on the tag. It publishes the container image again under
-the version, so `labview:0.1.0` and `labview:0.1` name the release. The
-version reaches the binary through `-X main.version`, so `labview -version`
-prints `0.1.0` from the release binary and from the image.
+`ci.yml` also runs on the tag, so the commit that the tag names passes the
+same checks as a pull request. The version reaches the binary through
+`-X main.version`, so `labview -version` prints `0.1.0` from a binary of the
+0.1.0 release.
 
 ## 9. What is not built
 
