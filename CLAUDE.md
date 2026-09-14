@@ -7,19 +7,24 @@ Rules for agents and humans who work in this repository.
 qemu-lab-manager holds the tooling for the QEMU lab. It builds one Go binary,
 `labview`.
 
-| Path | Content |
-|---|---|
-| `cmd/labview` | The main package. |
-| `internal/` | The packages of the service. |
-| `internal/web/static` | The browser application. |
-| `docs/design/` | One design document for each component. |
-| `changelogs/` | The changelog fragments and the released entries. |
-| `test/lab` | The fake lab and the browser checks. |
-| `deploy/` | The systemd unit, the polkit rule and the nginx file. |
-| `scripts/` | The check scripts. |
+| Path | Content | Its document |
+|---|---|---|
+| `cmd/labview` | The main package. | [`labview.md`](docs/design/labview.md) |
+| `internal/` | The packages of the service. | [`labview.md`](docs/design/labview.md) |
+| `internal/web/static` | The browser application. | [`labview.md`](docs/design/labview.md) |
+| `docs/design/` | One design document for each component. | |
+| `changelogs/` | The fragments and the released entries. | [`changelog.md`](docs/design/changelog.md) |
+| `test/lab` | The fake lab and the browser checks. | [`test/lab/README.md`](test/lab/README.md) |
+| `deploy/` | The systemd unit, the polkit rule and the nginx file. | [`labview.md`](docs/design/labview.md) |
+| `scripts/` | The check scripts. | [`checks.md`](docs/design/checks.md) |
+| `.github/workflows/` | The workflows. | [`checks.md`](docs/design/checks.md) |
+| `Dockerfile` | The container image. | [`container.md`](docs/design/container.md) |
 
 A design document gives the reason for a decision. `README.md` gives the build
 command and the run command.
+
+This file holds the rules. It does not describe what a part does, because the
+document of that part does. Follow the link.
 
 ## Workflow
 
@@ -37,7 +42,6 @@ Every change follows these steps.
 ## Limits for the agent
 
 - Do not merge a pull request. Only a human merges.
-- Do not change the checks to make a red check pass.
 - Do not push to `main`. Push to a branch and open a pull request.
 - Do not force-push a branch that another person uses.
 - Do not close an issue by hand. The merge closes it through the link.
@@ -105,51 +109,21 @@ test/lab/run.sh               # labview in a browser, against a fake lab
 ./scripts/check-changelog.sh  # the changelog fragments
 ```
 
-`test/lab/run.sh` needs Node and Python in addition to Go.
-
-- Install the packages one time. Run `npm install` in `test/lab`. The script
-  does not install them.
-- Playwright needs a browser. `npx playwright install chromium` downloads one.
-  On a machine that has a browser already, set `CHROMIUM_PATH` to that
-  executable.
-- The script prints the directory of the screenshots. `SHOTS_DIR` selects a
-  different directory.
-
-A change of behavior comes with a test. `test/lab/README.md` says how to add a
-browser check, and it says why the browser layer exists.
+A change of behavior comes with a test.
+[`test/lab/README.md`](test/lab/README.md) says how to set up the browser
+layer, how to add a check, and why the layer exists.
 
 ## Checks
 
-GitHub Actions runs the checks for each pull request. The Tests section lists
-the commands for a local machine.
+GitHub Actions runs the checks for each pull request.
+[`docs/design/checks.md`](docs/design/checks.md) says what each workflow
+holds, what each job checks, and how the gate works.
 
-`checks.yml` runs three jobs.
+Two rules live here, because they bind every change.
 
-- `documents` checks each markdown file. A line has 80 characters or fewer.
-  A table line and a line with a URL can be longer. A line does not end with
-  a space. A file ends with a newline.
-- `workflows` checks that the gate job of each workflow depends on every other
-  job of that workflow.
-- `changelog` checks each fragment in `changelogs/fragments/`, and it checks
-  that `CHANGELOG.md` matches `changelogs/changelog.yaml`.
-- `pull request rules` checks the description and the issue. The description
-  closes an issue, and that issue has one type label. The pull request also
-  adds a changelog fragment.
-
-`ci.yml` runs three jobs for the Go code.
-
-- `build, vet and test` runs `gofmt`, `go vet`, the build and the tests. The
-  tests run with the race detector.
-- `browser checks` runs labview in a browser against a fake lab. It keeps the
-  screenshots as an artifact.
-
-Each workflow ends with a gate job: `checks passed` and `ci passed`. A gate job
-depends on every other job of the workflow, and it fails if one of them does
-not pass. A skipped job and a cancelled job also fail the gate.
-
-The ruleset of `main` names the two gate jobs, and it names no other job. A new
-job therefore needs no change in the ruleset. Add each new job to the `needs`
-list of the gate. The `workflows` check fails if you forget.
+- A new job goes in the `needs` list of the gate of its workflow. The
+  `workflows` check fails if you forget.
+- Do not change a check to make a red check pass.
 
 ## Changelog
 
@@ -176,10 +150,18 @@ whole process.
 
 ## Documents
 
-- Documents and code change together, in the same pull request.
+A pull request updates the document of the part it changes. The two go in the
+same pull request.
+
+The table in the Repository section names the document of each part. Add a
+browser check, and `test/lab/README.md` changes. Add a CI job, and
+`docs/design/checks.md` changes. Change how a lease expires, and
+`docs/design/labview.md` changes.
+
 - A change that makes a document wrong also corrects that document.
 - A design document shows the current design. It is not a history.
 - Do not add a changelog section to a design document.
+- A new document goes in the table, so a reader reaches it from this file.
 
 ## Comments in code
 
