@@ -31,11 +31,24 @@ jobs:
       # The tag must name a release that CHANGELOG.md holds. A tag that runs
       # ahead of the release pull request fails here, before the release
       # exists, rather than producing a release with no notes.
+      #
+      # The image name is derived, not written here. ci.yml derives the same
+      # name, so the two cannot drift apart.
       - name: the notes of this version
         env:
           VERSION: ${{ steps.version.outputs.value }}
+          IMAGE: ghcr.io/${{ github.repository }}/labview
+          DOC: ${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/docs/design/container.md
         run: |
           python3 scripts/changelog.py notes --version "$VERSION" >notes.md
+          {
+            echo "### Container image"
+            echo
+            echo "    podman pull $IMAGE:$VERSION"
+            echo
+            echo "The tag names this release, and it does not move."
+            echo "[container.md]($DOC) lists every tag."
+          } >>notes.md
           cat notes.md
 
       # The same flags as the container image, so a binary from the release
