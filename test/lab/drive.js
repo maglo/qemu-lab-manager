@@ -100,7 +100,13 @@ async function tileCount(page, want) {
     `tile names stay on one line (heights ${headOverflow.map((h) => Math.round(h.name)).join(',')})`);
   check(headOverflow.every((h) => !h.wide), 'tile headers do not overflow their tile');
 
-  await page.screenshot({ path: `${OUT}/01-wall.png` });
+  // README.md shows this one, so it stops at the last tile. The rest of the
+  // viewport is empty background.
+  const wall = await page.$eval('#tiles', (el) => el.getBoundingClientRect().bottom);
+  await page.screenshot({
+    path: `${OUT}/01-wall.png`,
+    clip: { x: 0, y: 0, width: 1400, height: Math.ceil(wall) },
+  });
 
   // --- expanded: console ---
   await page.click('.tile:has-text("el9-build")');

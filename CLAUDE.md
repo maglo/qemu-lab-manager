@@ -13,6 +13,7 @@ qemu-lab-manager holds the tooling for the QEMU lab. It builds one Go binary,
 | `internal/` | The packages of the service. | [`labview.md`](docs/design/labview.md) |
 | `internal/web/static` | The browser application. | [`labview.md`](docs/design/labview.md) |
 | `docs/design/` | One document for each component and each process. | |
+| `docs/images/` | The pictures that `README.md` shows. | [`test/lab/README.md`](test/lab/README.md) |
 | `changelogs/` | The fragments and the released entries. | [`changelog.md`](docs/design/changelog.md) |
 | `test/lab` | The fake lab and the browser checks. | [`test/lab/README.md`](test/lab/README.md) |
 | `deploy/` | The systemd unit, the polkit rule and the nginx file. | [`labview.md`](docs/design/labview.md) |
