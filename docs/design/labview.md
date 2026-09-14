@@ -226,9 +226,10 @@ tile is a serial tail, and expanding opens on the serial tab instead of
 console. Same view, different default.
 
 Beyond roughly eight tiles, every live RFB session is a decoder running in
-one browser tab. At that point the wall should switch to periodic
-screenshots and open RFB only on click. Build the tile as a component that
-can render either, so this is a config change and not a rewrite.
+one browser tab. At that point the wall switches to periodic screenshots and
+opens RFB only on click. The tile is a component that renders either, so
+`-tile-mode=screenshot` is a config change and not a rewrite. The frames
+come from QMP `screendump`; section 12 says why.
 
 ---
 
@@ -295,10 +296,6 @@ wants a systemd tool needs a better reason than convenience.
 
 **Stealing a lease.** Expiry covers the common case. Add stealing only if
 expiry turns out to be too slow in practice.
-
-**The screenshot tile.** The tile is a component with a pluggable renderer,
-and `-tile-mode=screenshot` selects the other one, as section 7 asks. The
-renderer has no capture source yet, so it says what it waits for.
 
 **Recording and replay of framebuffer sessions.** Serial transcripts give
 most of the forensic value at a fraction of the cost.

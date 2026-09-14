@@ -46,6 +46,11 @@ export const api = {
       body: JSON.stringify({ op }),
     }),
 
+  // A cache buster, because the tile asks for the same URL again and again
+  // and a screenshot is a different frame each time.
+  screenshotURL: (id) =>
+    `/api/machines/${encodeURIComponent(id)}/screenshot?t=${Date.now()}`,
+
   recordingURL: (id, name, inline = false) =>
     `/api/machines/${encodeURIComponent(id)}/recordings/${encodeURIComponent(name)}` +
     (inline ? '?inline=1' : ''),

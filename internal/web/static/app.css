@@ -321,6 +321,16 @@ table.kv td { font-family: var(--mono); font-size: 12px; word-break: break-word;
 .tile-screen-slot { position: relative; }
 .tile-screen-slot .tile-screen { position: relative; }
 
+/* A screenshot tile. The frame is letterboxed inside the tile's fixed
+   aspect, so a guest that changes its resolution does not move the grid. */
+.shot-host { width: 100%; height: 100%; }
+.tile-shot {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #000;
+}
+
 /* The tile's hit target. Transparent, and above the framebuffer. */
 .tile-cover { position: absolute; inset: 0; z-index: 2; background: transparent; }
 .serial-host .xterm-host { padding: 4px; }

@@ -23,6 +23,7 @@ VNC_PORT=15901
 
 PORT=${PORT:-18080}
 PROXY_PORT=${PROXY_PORT:-18081}
+SHOT_PORT=${SHOT_PORT:-18082}
 work=$(mktemp -d)
 export SHOTS_DIR=${SHOTS_DIR:-$work/shots}
 
@@ -38,6 +39,7 @@ cleanup() {
     echo "=== proxy log ===";   tail -20 "$work/proxy.log" 2>/dev/null
     echo "=== fake vnc log ==="; tail -20 "$work/vnc.log" 2>/dev/null
     echo "=== fake qmp log ==="; tail -20 "$work/qmp.log" 2>/dev/null
+    echo "=== screenshot labview log ==="; tail -20 "$work/labview-shots.log" 2>/dev/null
   fi
   rm -rf "$LAB_DIR"
   return $code
@@ -75,12 +77,26 @@ mkdir -p "$work/screenshots"
   >"$work/labview.log" 2>&1 &
 pids+=($!)
 
+# A second labview, on the same inventory, with the wall in screenshot mode.
+# The mode is a flag, so the only way to drive it is a second process.
+echo "== starting labview on 127.0.0.1:$SHOT_PORT with screenshot tiles"
+"$work/labview" \
+  -listen "127.0.0.1:$SHOT_PORT" \
+  -inventory "$INVENTORY_DIR" \
+  -host-access fake \
+  -recordings-dir "$work/recordings-shots" \
+  -screenshot-dir "$work/screenshots" \
+  -screenshot-interval 1s \
+  -tile-mode screenshot \
+  >"$work/labview-shots.log" 2>&1 &
+pids+=($!)
+
 echo "== starting the identity-asserting proxy on 127.0.0.1:$PROXY_PORT"
 node "$here/proxy.js" >"$work/proxy.log" 2>&1 &
 pids+=($!)
 
-# Wait for both to answer rather than sleeping and hoping.
-for name in "labview:$PORT" "proxy:$PROXY_PORT"; do
+# Wait for each to answer rather than sleeping and hoping.
+for name in "labview:$PORT" "proxy:$PROXY_PORT" "screenshot labview:$SHOT_PORT"; do
   label=${name%%:*}; port=${name##*:}
   for _ in $(seq 1 40); do
     if curl -fs -o /dev/null "http://127.0.0.1:$port/healthz"; then
@@ -94,7 +110,7 @@ for name in "labview:$PORT" "proxy:$PROXY_PORT"; do
 done
 
 echo "== driving a browser"
-node "$here/drive.js"
+SHOT_URL="http://127.0.0.1:$SHOT_PORT" node "$here/drive.js"
 code=$?
 
 echo
