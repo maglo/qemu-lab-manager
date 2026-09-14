@@ -1,8 +1,9 @@
 ---
 trivial:
-  - "docs - move the description of each workflow and each job from
-    `CLAUDE.md` to `docs/design/checks.md`, and correct four errors that the
-    copy had drifted into. `CLAUDE.md` now holds the rules and links to the
-    document of each part, so adding a test or a job changes that document
-    and not `CLAUDE.md`
+  - "docs - make `CLAUDE.md` an index. It holds the rules of the repository
+    and links to the document of each part, and it no longer repeats what a
+    document says. The description of each workflow and each job moves to the
+    new `docs/design/checks.md`, which corrects four statements that the copy
+    had drifted into. The changelog format, the check commands and the names
+    of the required jobs each now live in one file
     (https://github.com/maglo/qemu-lab-manager/issues/24)."
