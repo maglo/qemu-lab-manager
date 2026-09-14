@@ -1,12 +1,17 @@
 # qemu-lab-manager
 
-The tooling for the QEMU lab. It builds one Go binary, `labview`.
+The tooling for a QEMU lab. It builds one Go binary, `labview`.
 
 ## labview
 
-A console wall for the QEMU lab. Developers see every machine at a glance,
-open one to drive it, and attach to serial when a scenario needs it. One Go
-binary, one inventory directory, no database.
+You run QEMU virtual machines, and each machine has its own VNC port. To see
+four machines you open four noVNC tabs. You also track which port belongs to
+which machine.
+
+labview replaces those tabs with one wall. The wall shows a live screen for
+every machine at once. You click a machine to expand it and to take control.
+You attach to the serial line when a scenario needs it. One Go binary, one
+inventory directory, no database.
 
 This file tells you how to build labview and how to run it. It does not
 describe how labview works. Each document below is the one place that
