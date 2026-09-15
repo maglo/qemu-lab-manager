@@ -192,6 +192,13 @@ a convenience: a machine with no `unit` has no power operations, and labview
 does not guess a unit name from an id. Section 12 requires the inventory to
 be the id-to-unit mapping.
 
+The field gates more than power. The unit carries the state of the machine
+and its main pid, and the command line, the disks and the interfaces all come
+from that pid. A machine with no `unit` shows none of them, and its liveness
+falls back to the serial line. That is correct behaviour, and it is more than
+the name of the field suggests. Give every machine a `unit` if the details
+tab is to be worth opening.
+
 Unknown settings are kept and shown verbatim on the details tab, so a
 producer newer than labview does not break the load.
 

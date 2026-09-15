@@ -225,7 +225,7 @@ func (l *Local) Inspect(ctx context.Context, m inventory.Machine) (Details, erro
 		}
 	} else {
 		d.Warnings = append(d.Warnings,
-			"no systemd unit in the inventory, so unit state, logs and power operations are unavailable")
+			"no systemd unit in the inventory, so unit state, the command line and power operations are unavailable")
 	}
 
 	// The command line comes from the running process, so it is only
