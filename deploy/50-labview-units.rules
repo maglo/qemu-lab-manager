@@ -5,6 +5,15 @@
 //
 // Install to /etc/polkit-1/rules.d/50-labview-units.rules.
 //
+// This rule is mandatory. Without it every power operation fails: a system
+// service has no logind session, so the action falls through to auth_admin
+// and no agent is present to answer the prompt.
+//
+// The rule matches the user name. polkit reads the uid from the kernel and
+// maps it through the host's NSS, so labview needs a real host account.
+// polkit 125 on Enterprise Linux 10 has no subject.uid; that field arrives
+// in polkit 127. Design section 10 has the whole chain.
+//
 // Two layers have to agree for a power operation to happen at all. labview
 // maps a machine id to a unit through the inventory, so it can only ever ask
 // about units the inventory named; this rule is the host's own opinion about

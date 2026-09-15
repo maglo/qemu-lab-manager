@@ -1,16 +1,31 @@
 # labview -- a console wall for the QEMU lab.
 #
-# labview runs as its own user, not root (design section 12). It needs three
+# labview runs as its own user, not root (design section 10). It needs three
 # things from the host and nothing else:
 #
 #   - read/write on the QEMU serial and QMP sockets
 #   - the system bus, to start, stop and restart units via systemd
 #   - a directory it shares with QEMU, for screenshots
 #
-# Create that directory before the first start. QEMU writes the capture as
-# its own user, and labview reads it and removes it again:
+# Create the account first. polkit matches the user name that the host sees,
+# so labview needs a real host account:
+#
+#   useradd --system --home-dir /var/lib/labview --shell /sbin/nologin labview
+#
+# Create the screenshot directory too. QEMU writes the capture as its own
+# user, and labview reads it and removes it again:
 #
 #   install -d -o labview -g qemu -m 2770 /var/lib/labview/screenshots
+#
+# The polkit rule is mandatory. Install deploy/50-labview-units.rules with
+# this unit. A system service has no logind session, so polkit evaluates the
+# action as neither local nor active, falls through to auth_admin, and finds
+# no agent to answer it. Every power operation then fails, and it fails in a
+# way that reads as a labview fault.
+#
+# Do not run labview as root. systemd short-circuits the privilege check for
+# a root caller, so polkit never runs and the rule bounds nothing. Design
+# section 10 has the whole identity chain.
 #
 # Install to /etc/systemd/system/labview.service and adjust the paths and
 # the supplementary groups to match the lab.
