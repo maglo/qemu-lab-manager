@@ -367,6 +367,29 @@ that holder in the UI, and writes it to the activity trail of section 4. The
 run id in the trail is the run in the CI system, which is what makes the
 trail worth reading after a failure.
 
+### The account labview runs as
+
+labview runs as its own host account, and whatever installs the unit creates
+it. The account must be a real host account, because polkit maps the caller's
+uid through the host's NSS. A uid with no name behind it matches no rule.
+
+The chain from a D-Bus call to a polkit decision runs like this:
+
+- `dbus-broker` reads `SO_PEERCRED` on labview's connection to the system
+  bus. The uid therefore comes from the kernel, not from the caller.
+- systemd passes polkit a subject that names the bus connection. The subject
+  carries no pid, so nothing here depends on a pid matching.
+- polkit maps the uid to a user name through host NSS, and
+  `50-labview-units.rules` matches that name.
+
+The rule matches a name because polkit 125 on Enterprise Linux 10 has no
+`subject.uid`. That field arrives in polkit 127.
+
+**Never run labview as root.** systemd short-circuits the privilege check for
+a root caller, before polkit runs at all. The rule then bounds nothing, and
+labview can manage every unit on the host. The unit sets a user for exactly
+this reason.
+
 VNC and serial endpoints are bound to the hypervisor's management address,
 or to a unix socket with labview running alongside. They are not reachable
 from the developer network. labview is the only path in, which is what makes
@@ -497,6 +520,12 @@ lab that the collection built. A default that matches nothing is worse than a
 wide one here: polkit returns `NOT_HANDLED` for a unit the rule skips,
 `NOT_HANDLED` denies, and every power click then fails in a way that reads as
 a labview fault. A deployer narrows the pattern to the lab's own naming.
+
+The rule is mandatory, not an optimisation. A system service has no logind
+session, so polkit evaluates `local` and `active` as false. The action falls
+through to `allow_any`, which is `auth_admin`, and no agent is present to
+answer that prompt. Every power operation fails. Install the rule with the
+unit, and read section 10 for the account the rule names.
 
 Restart is the only destructive thing in an otherwise read-mostly tool, so
 it confirms in the UI and is logged with the identity from the proxy.
