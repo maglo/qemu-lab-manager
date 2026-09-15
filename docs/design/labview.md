@@ -102,7 +102,9 @@ half-serial and half-GUI.
 
 A scenario harness takes the same lease a human does. That is what stops a
 developer from typing into a VM mid-test, and it needs no special
-"automation mode".
+"automation mode". A harness arrives under a name of its own, one for each
+run, so two runs of one harness never contend for one machine. Section 10
+gives the form of that name and says who issues it.
 
 ---
 
@@ -343,6 +345,27 @@ a way that looks like a labview bug.
   header completely: it is the only thing that names the lease holder and the
   only thing in the audit trail. A proxy that forwards the header a caller
   sent lets that caller name themselves.
+
+### What a harness presents
+
+A harness needs a name for the same reason a human does: the lease names one
+holder. The proxy issues it one in the form `harness/<name>/<run-id>`, so a
+CI harness arrives as `harness/ci/4812`.
+
+The run id is part of the name on purpose. With one name for every run of a
+harness, two runs look like one holder. They contend for a single lease, and
+each one takes the machine from the other mid-scenario. That failure is
+silent, and it reads as a flaky test. A name for each run cannot collide.
+
+The proxy issues the name from a token the harness presents, which is a
+token the CI system already holds. It maps that token to a name exactly as
+it maps a person's session to a user name. A caller never sets its own name,
+because labview trusts the header completely.
+
+labview needs no change for this. It takes the name the header carries, shows
+that holder in the UI, and writes it to the activity trail of section 4. The
+run id in the trail is the run in the CI system, which is what makes the
+trail worth reading after a failure.
 
 VNC and serial endpoints are bound to the hypervisor's management address,
 or to a unix socket with labview running alongside. They are not reachable
