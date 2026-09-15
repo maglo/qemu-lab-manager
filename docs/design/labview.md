@@ -286,9 +286,19 @@ Gathering this needs a small amount of host-side introspection — reading the
 unit, its cgroup, its command line. That is all readable from the hypervisor
 without libvirt and without an agent, which is the point.
 
-`qemu-img` is the one program labview runs. Every other host interaction is a
-socket, a file read or a D-Bus call. Keep it that way. A new facility that
-wants a systemd tool needs a better reason than convenience.
+labview runs no program at all. Every host interaction is a socket, a file
+read or a D-Bus call. Keep it that way. A new facility that wants to run a
+tool needs a better reason than convenience.
+
+The two disk sizes come from the image file. labview reads the virtual size
+from the qcow2 header, and it reads the actual size from the blocks the file
+occupies. A file without the qcow2 magic is raw, and a raw image presents
+its own length. Both numbers are the numbers `qemu-img` reports, so a reader
+who checks by hand sees the same values.
+
+The actual size counts one file. An overlay therefore reports what the
+overlay holds, and it names its backing file, because that is where the rest
+of the content lives.
 
 ---
 

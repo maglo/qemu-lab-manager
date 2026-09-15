@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - "host - labview reads the two disk sizes from the image itself. The virtual size is a qcow2 header field, and the actual size is the blocks that the file occupies. A file without the qcow2 magic is raw, and a raw image presents its own length (https://github.com/maglo/qemu-lab-manager/issues/37)."
+  - "host - labview no longer runs ``qemu-img``, so it runs no program at all. Every host interaction is a socket, a file read or a D-Bus call (https://github.com/maglo/qemu-lab-manager/issues/37)."
+  - "web - the details tab reports an image it cannot read as ``image unreadable`` on that one disk row. The other rows keep their sizes (https://github.com/maglo/qemu-lab-manager/issues/37)."
