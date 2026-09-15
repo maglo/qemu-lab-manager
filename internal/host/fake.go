@@ -84,7 +84,7 @@ func (f *Fake) Inspect(_ context.Context, m inventory.Machine) (Details, error) 
 	d := Details{}
 	if !m.CanPower() {
 		d.Warnings = append(d.Warnings,
-			"no systemd unit in the inventory, so unit state, logs and power operations are unavailable")
+			"no systemd unit in the inventory, so unit state, the command line and power operations are unavailable")
 		return d, nil
 	}
 	d.Unit = f.unit(m)
