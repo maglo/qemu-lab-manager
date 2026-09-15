@@ -3,11 +3,9 @@ package host
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -25,16 +23,9 @@ const (
 
 // LocalOptions configures the hypervisor-local implementation.
 type LocalOptions struct {
-	// QEMUImgPath is the qemu-img binary used for disk sizes. Empty looks
-	// it up on PATH; disk sizes are simply omitted if it is absent.
-	QEMUImgPath string
-
 	// ProcRoot and ArpFile are overridable for tests.
 	ProcRoot string
 	ArpFile  string
-
-	// CommandTimeout bounds each helper invocation.
-	CommandTimeout time.Duration
 
 	Log *slog.Logger
 }
@@ -59,9 +50,6 @@ type Local struct {
 // the wall even on a machine with no systemd reachable -- the affected tabs
 // then report why they are empty, which is more useful than refusing to boot.
 func NewLocal(opts LocalOptions) *Local {
-	if opts.CommandTimeout <= 0 {
-		opts.CommandTimeout = 10 * time.Second
-	}
 	if opts.ProcRoot == "" {
 		opts.ProcRoot = "/proc"
 	}
@@ -223,9 +211,9 @@ func (l *Local) Power(ctx context.Context, m inventory.Machine, op Op) error {
 
 // Inspect gathers the details tab.
 //
-// It is deliberately forgiving: a switched-off machine, a missing qemu-img, an
-// unreachable bus each cost one field and one warning rather than the whole
-// page.
+// It is deliberately forgiving: a switched-off machine, an unreadable image,
+// an unreachable bus each cost one field and one warning rather than the
+// whole page.
 func (l *Local) Inspect(ctx context.Context, m inventory.Machine) (Details, error) {
 	var d Details
 
@@ -255,7 +243,7 @@ func (l *Local) Inspect(ctx context.Context, m inventory.Machine) (Details, erro
 			"machine is not running, so its command line, disks and interfaces are not known")
 	}
 
-	l.enrichDisks(ctx, &d)
+	l.enrichDisks(&d)
 	l.enrichNICs(&d)
 	return d, nil
 }
@@ -276,45 +264,15 @@ func (l *Local) processArgs(pid int) ([]string, error) {
 	return parts, nil
 }
 
-// qemuImgInfo is the subset of qemu-img's JSON output that the details tab
-// shows.
-type qemuImgInfo struct {
-	VirtualSize int64  `json:"virtual-size"`
-	ActualSize  int64  `json:"actual-size"`
-	Format      string `json:"format"`
-	BackingFile string `json:"backing-filename"`
-}
-
-// enrichDisks fills in sizes and backing files. Reading an image that a VM is
-// writing to is safe: qemu-img info opens it read only.
-func (l *Local) enrichDisks(ctx context.Context, d *Details) {
-	if len(d.Disks) == 0 {
-		return
-	}
-	bin := l.opts.QEMUImgPath
-	if bin == "" {
-		var err error
-		bin, err = exec.LookPath("qemu-img")
-		if err != nil {
-			d.Warnings = append(d.Warnings, "qemu-img not found, so disk sizes are unavailable")
-			return
-		}
-	}
-
+// enrichDisks fills in sizes and backing files. Reading an image a VM is
+// writing to is safe: labview opens it read only and reads header fields
+// that the running machine does not move.
+func (l *Local) enrichDisks(d *Details) {
 	for i := range d.Disks {
 		disk := &d.Disks[i]
-		cctx, cancel := context.WithTimeout(ctx, l.opts.CommandTimeout)
-		// argv, not a shell: the path comes from the command line of a
-		// running process and is never interpolated into a string.
-		out, err := exec.CommandContext(cctx, bin, "info", "--output=json", "--force-share", disk.Path).Output()
-		cancel()
+		info, err := readImageInfo(disk.Path)
 		if err != nil {
-			disk.Error = "qemu-img info failed: " + firstLine(err.Error())
-			continue
-		}
-		var info qemuImgInfo
-		if err := json.Unmarshal(out, &info); err != nil {
-			disk.Error = "qemu-img output not understood"
+			disk.Error = "image unreadable: " + firstLine(err.Error())
 			continue
 		}
 		disk.VirtualSize = info.VirtualSize
