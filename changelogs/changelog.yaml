@@ -1,4 +1,32 @@
 releases:
+  0.2.0:
+    release_date: '2026-09-16'
+    changes:
+      release_summary:
+      - The second release of labview. A machine now has a control channel, the QMP socket that the ``control:`` field names. labview sends a key chord over it, and it takes one frame of the screen over it. A screenshot tile therefore shows a real picture. The deployment is the systemd unit of ``deploy/``, and there is no container image. An operator who runs the image moves to the unit, the service account and the polkit rule. labview also reads no host journal, and it runs no program at all. Every host interaction is a socket, a file read or a D-Bus call.
+      minor_changes:
+      - api - ``GET /api/machines/{id}/screenshot`` answers with one frame of the screen as PNG. It needs no lease, because the wall shows that screen to every viewer already (https://github.com/maglo/qemu-lab-manager/issues/35).
+      - api - ``POST /api/machines/{id}/keys`` sends one key chord over the control socket. It takes the write lease, the same one that gates the framebuffer and the serial line, and the chord extends that lease (https://github.com/maglo/qemu-lab-manager/issues/35).
+      - api - the machine listing reports ``hasControl``, so a client knows which machines have a control socket (https://github.com/maglo/qemu-lab-manager/issues/35).
+      - deploy - the systemd unit drops the ``systemd-journal`` supplementary group. labview reads no journal, so it needs no access to one (https://github.com/maglo/qemu-lab-manager/issues/44).
+      - deploy - the systemd unit passes ``-screenshot-dir`` and says how to create that directory. QEMU writes the capture as its own user, so labview shares the directory with QEMU (https://github.com/maglo/qemu-lab-manager/issues/35).
+      - host - labview no longer runs ``qemu-img``, so it runs no program at all. Every host interaction is a socket, a file read or a D-Bus call (https://github.com/maglo/qemu-lab-manager/issues/37).
+      - host - labview reads the two disk sizes from the image itself. The virtual size is a qcow2 header field, and the actual size is the blocks that the file occupies. A file without the qcow2 magic is raw, and a raw image presents its own length (https://github.com/maglo/qemu-lab-manager/issues/37).
+      - inventory - a machine file takes ``control:``, the QMP socket of the machine. A path is a unix socket and ``host:port`` is a TCP port, exactly as ``serial:`` is classified (https://github.com/maglo/qemu-lab-manager/issues/35).
+      - labview - ``-screenshot-dir`` names the directory QEMU writes a capture to, and ``-screenshot-interval`` sets how often a tile asks for a new frame. labview reads each capture and removes it (https://github.com/maglo/qemu-lab-manager/issues/36).
+      - qmp - the client skips asynchronous ``event`` lines before it matches a reply. A client that takes the next line for its reply reads the wrong one for every command after it (https://github.com/maglo/qemu-lab-manager/issues/36).
+      - 'web - a screenshot tile shows a real picture. ``-tile-mode=screenshot`` now has a capture source: the tile asks for one frame at a time over QMP ``screendump``, and a tile whose machine has no control socket says so (https://github.com/maglo/qemu-lab-manager/issues/36).'
+      - web - the details tab reports an image it cannot read as ``image unreadable`` on that one disk row. The other rows keep their sizes (https://github.com/maglo/qemu-lab-manager/issues/37).
+      removed_features:
+      - api - ``GET /api/machines/{id}/logs`` and ``GET /ws/logs/{id}`` are gone, with the ``-log-lines`` flag that bounded the first one (https://github.com/maglo/qemu-lab-manager/issues/44).
+      - container - labview no longer ships a container image. The deployment on a hypervisor is the systemd unit of `deploy/`, and a release attaches the binary for each platform (https://github.com/maglo/qemu-lab-manager/issues/39).
+      - host - the ``Access`` interface drops ``Logs`` and ``TailLogs``. labview runs no systemd tool (https://github.com/maglo/qemu-lab-manager/issues/44).
+      - 'web - the logs tab is gone. labview concerns itself with the VMs, and a host journal is host business. The serial transcript replaces the tab: labview records it and replays it, and maglo/ansible-collection-qemu#161 moves the guest serial console onto a socket, so the unit journal now holds the messages of QEMU and the start and stop lines of systemd only (https://github.com/maglo/qemu-lab-manager/issues/44).'
+      security_fixes:
+      - api - ``control`` joins ``vnc`` and ``serial`` in the withheld set of the details tab. The tab shows every other field of the inventory entry verbatim, so a producer that writes ``control:`` would otherwise publish the QMP socket path to every viewer (https://github.com/maglo/qemu-lab-manager/issues/35).
+      bugfixes:
+      - deploy - the polkit rule accepts a systemd instance unit. The shipped pattern matched ``qemu-<machine>.service`` only, and ``maglo.qemu`` names its units ``qemu-vm@<machine>.service``. An unmatched rule returns ``NOT_HANDLED``, which denies, so every power operation of a new deployment failed (https://github.com/maglo/qemu-lab-manager/issues/38).
+      - host - the warning for a machine with no ``unit`` names the command line. It named the logs tab, which labview no longer has (https://github.com/maglo/qemu-lab-manager/issues/34).
   0.1.0:
     release_date: '2026-09-13'
     changes:

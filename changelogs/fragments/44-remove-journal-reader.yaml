@@ -1,7 +1,0 @@
----
-removed_features:
-  - "web - the logs tab is gone. labview concerns itself with the VMs, and a host journal is host business. The serial transcript replaces the tab: labview records it and replays it, and maglo/ansible-collection-qemu#161 moves the guest serial console onto a socket, so the unit journal now holds the messages of QEMU and the start and stop lines of systemd only (https://github.com/maglo/qemu-lab-manager/issues/44)."
-  - "api - ``GET /api/machines/{id}/logs`` and ``GET /ws/logs/{id}`` are gone, with the ``-log-lines`` flag that bounded the first one (https://github.com/maglo/qemu-lab-manager/issues/44)."
-  - "host - the ``Access`` interface drops ``Logs`` and ``TailLogs``. labview runs no systemd tool (https://github.com/maglo/qemu-lab-manager/issues/44)."
-minor_changes:
-  - "deploy - the systemd unit drops the ``systemd-journal`` supplementary group. labview reads no journal, so it needs no access to one (https://github.com/maglo/qemu-lab-manager/issues/44)."

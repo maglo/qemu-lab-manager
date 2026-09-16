@@ -1,5 +1,0 @@
----
-trivial:
-  - "docs - say that the ``unit`` field of an inventory file gates more than power. The unit carries the state of the machine and its main pid, and the command line, the disks and the interfaces all come from that pid. A machine with no ``unit`` shows none of them, and its liveness falls back to the serial line (https://github.com/maglo/qemu-lab-manager/issues/34)."
-bugfixes:
-  - "host - the warning for a machine with no ``unit`` names the command line. It named the logs tab, which labview no longer has (https://github.com/maglo/qemu-lab-manager/issues/34)."

@@ -1,6 +1,0 @@
----
-trivial:
-  - "docs - show a picture of the wall in `README.md`. A reader sees what
-    labview looks like before they build it. The browser checks write the
-    shot, so a command regenerates it, and they now clip it to the last tile
-    (https://github.com/maglo/qemu-lab-manager/issues/31)."

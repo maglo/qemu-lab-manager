@@ -1,3 +1,0 @@
----
-trivial:
-  - "docs - say what identity a scenario harness presents. The proxy sets ``X-Forwarded-User`` to ``harness/<name>/<run-id>``, from a token the harness holds, so two runs of one harness never contend for one write lease. Sections 4 and 10 of the design document give the form and the reason, and ``nginx-labview.conf`` names the header a machine caller needs. labview needs no change, because it takes the name that the header carries (https://github.com/maglo/qemu-lab-manager/issues/41)."
