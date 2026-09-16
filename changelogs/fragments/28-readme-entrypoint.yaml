@@ -1,9 +1,0 @@
----
-trivial:
-  - "docs - make `README.md` the entry point for a reader. It welcomes the
-    reader, gives the build command and the run command, and names the
-    document to read next. The inventory format, the HTTP surface, the
-    deployment and the deferred work move to `docs/design/labview.md`, which
-    is now the one place that describes them. Section 5 grows from 4
-    endpoints to the 15 that the code serves
-    (https://github.com/maglo/qemu-lab-manager/issues/28)."

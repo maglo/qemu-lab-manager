@@ -1,7 +1,0 @@
----
-trivial:
-  - "docs - say in `README.md` what problem labview solves. The file opened
-    with \"the QEMU lab\", which means nothing to a reader who has no relation
-    to that lab. It now names the problem first: one VNC port per machine
-    means one noVNC tab per machine, and labview replaces those tabs with one
-    wall (https://github.com/maglo/qemu-lab-manager/issues/30)."

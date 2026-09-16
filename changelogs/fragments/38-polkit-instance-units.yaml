@@ -1,3 +1,0 @@
----
-bugfixes:
-  - "deploy - the polkit rule accepts a systemd instance unit. The shipped pattern matched ``qemu-<machine>.service`` only, and ``maglo.qemu`` names its units ``qemu-vm@<machine>.service``. An unmatched rule returns ``NOT_HANDLED``, which denies, so every power operation of a new deployment failed (https://github.com/maglo/qemu-lab-manager/issues/38)."

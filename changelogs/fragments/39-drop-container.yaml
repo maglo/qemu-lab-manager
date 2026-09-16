@@ -1,9 +1,0 @@
----
-removed_features:
-  - "container - labview no longer ships a container image. The deployment on
-    a hypervisor is the systemd unit of `deploy/`, and a release attaches the
-    binary for each platform
-    (https://github.com/maglo/qemu-lab-manager/issues/39)."
-trivial:
-  - "ci - the workflow no longer builds and publishes an image
-    (https://github.com/maglo/qemu-lab-manager/issues/39)."
