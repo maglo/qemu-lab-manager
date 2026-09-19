@@ -25,6 +25,14 @@ export class Tile {
     // into the viewport, which is what keeps the session alive.
     this.screen = el('div', { class: 'tile-screen' });
 
+    // What the renderer is doing, over the picture it draws. A framebuffer
+    // that lost its connection keeps the last frame it painted, which reads
+    // as a live screen that happens to be still, so the renderer's own state
+    // has to be visible. The note lives inside the screen, so it follows it
+    // into the expanded view.
+    this.note = el('div', { class: 'screen-note', hidden: true });
+    this.screen.append(this.note);
+
     // A transparent hit target over the screen.
     //
     // noVNC installs its own pointer handlers on the canvas and stops them
@@ -73,7 +81,9 @@ export class Tile {
     if (this.summary.hasConsole) {
       this.renderer = this.tileMode === 'screenshot'
         ? new ScreenshotRenderer(this.summary, { everyMs: this.screenshotEveryMs })
-        : new RFBRenderer(this.summary, { onState: () => this.paintState() });
+        : new RFBRenderer(this.summary, {
+          onState: (state, detail) => this.paintScreen(state, detail),
+        });
     } else if (this.summary.hasSerial) {
       // Serial-only: the tile is a serial tail (design section 7).
       this.renderer = new SerialTailRenderer(this.summary);
@@ -82,13 +92,26 @@ export class Tile {
       this.renderer = new NoConsoleRenderer(this.summary);
     }
 
-    this.screen.append(this.renderer.element);
+    this.screen.prepend(this.renderer.element);
     this.renderer.connect();
   }
 
   update(summary) {
     this.summary = summary;
     this.paintState();
+  }
+
+  // paintScreen reports what the renderer is doing. Only a state that is not
+  // "connected" says anything: a working framebuffer needs no label.
+  paintScreen(state, detail) {
+    const text = {
+      connecting: 'connecting to the console',
+      reconnecting: `console lost${detail ? `: ${detail}` : ''}; connecting again`,
+      failed: detail || 'the console is not available',
+    }[state];
+    this.note.textContent = text || '';
+    this.note.hidden = !text;
+    this.note.className = 'screen-note' + (state === 'failed' ? ' bad' : '');
   }
 
   paintState() {

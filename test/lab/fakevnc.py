@@ -19,6 +19,41 @@ NAME = b"fake-el9-build"
 PSEUDO_QEMU_EXT_KEY_EVENT = -258
 PSEUDO_EXTENDED_MOUSE_BUTTONS = -316
 
+# Live client sockets, so the control port can drop them. A restart of QEMU
+# looks exactly like this from the browser, and it is the case the console has
+# to come back from (https://github.com/maglo/qemu-lab-manager/issues/54).
+live = set()
+live_lock = threading.Lock()
+
+def drop_all():
+    with live_lock:
+        conns, live_now = list(live), len(live)
+        live.clear()
+    for conn in conns:
+        try:
+            conn.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        conn.close()
+    return live_now
+
+def control(port):
+    """A line on this port drops every console connection."""
+    s = socket.socket()
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind(("127.0.0.1", port))
+    s.listen(4)
+    print(f"[fakevnc] control on 127.0.0.1:{port}", flush=True)
+    while True:
+        conn, _ = s.accept()
+        dropped = drop_all()
+        print(f"[fakevnc] dropped {dropped} connection(s) on request", flush=True)
+        try:
+            conn.sendall(f"dropped {dropped}\n".encode())
+        except OSError:
+            pass
+        conn.close()
+
 def pixel_format():
     # 32bpp, depth 24, little-endian, true colour, 8 bits each, shifts 16/8/0
     return struct.pack(">BBBBHHHBBB3x", 32, 24, 0, 1, 255, 255, 255, 16, 8, 0)
@@ -37,6 +72,8 @@ def framebuffer(tick):
     return b"".join(rows)
 
 def serve(conn, addr):
+    with live_lock:
+        live.add(conn)
     try:
         conn.sendall(b"RFB 003.008\n")
         client_version = recvn(conn, 12)
@@ -109,6 +146,8 @@ def serve(conn, addr):
     except (ConnectionError, OSError) as e:
         print(f"[fakevnc] {addr} gone: {e}", flush=True)
     finally:
+        with live_lock:
+            live.discard(conn)
         conn.close()
 
 def recvn(conn, n):
@@ -122,6 +161,7 @@ def recvn(conn, n):
 
 if __name__ == "__main__":
     port = int(sys.argv[1])
+    threading.Thread(target=control, args=(port + 1,), daemon=True).start()
     s = socket.socket()
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(("127.0.0.1", port))
