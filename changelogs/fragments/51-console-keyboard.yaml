@@ -1,0 +1,11 @@
+---
+bugfixes:
+  - "rfb - the input filter knows the client messages that noVNC sends to
+    QEMU, so a key press no longer closes the console
+    (https://github.com/maglo/qemu-lab-manager/issues/51)."
+  - "rfb - the filter reads the extended clipboard length as signed, so a
+    clipboard write no longer stalls the client stream
+    (https://github.com/maglo/qemu-lab-manager/issues/51)."
+  - "web - click focus on the framebuffer follows the write lease, so a
+    session that lost focus takes it back with a click
+    (https://github.com/maglo/qemu-lab-manager/issues/51)."

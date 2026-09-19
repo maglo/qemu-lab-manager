@@ -29,6 +29,30 @@ const (
 	msgClientCutText            = 6
 )
 
+// Client to server messages from the extensions that QEMU offers and the
+// vendored noVNC accepts. A filter that does not know these loses the message
+// boundary on the first key press.
+const (
+	msgEnableContinuousUpdates = 150
+	msgClientFence             = 248
+	msgXvpOp                   = 250
+	msgSetDesktopSize          = 251
+	msgQEMU                    = 255
+)
+
+// QEMU client message sub-types. Only the extended key event is defined.
+const subQEMUExtendedKeyEvent = 0
+
+// extendedPointerMark is the marker bit that the extended mouse button
+// encoding sets in the button mask. It tells the seven byte pointer event
+// apart from the six byte one, which is the only way to read either.
+const extendedPointerMark = 0x80
+
+// maxBuffered bounds the bytes held for one incomplete message. A websocket
+// frame is already capped, so this catches the other way memory grows: a
+// length field that names more bytes than the client will ever send.
+const maxBuffered = 4 << 20
+
 // phase tracks where in the protocol the client stream is. The handshake has
 // its own framing, and it must pass through untouched.
 type phase int
@@ -102,6 +126,11 @@ func (f *InputFilter) Split(p []byte) ([]Message, error) {
 			return out, err
 		}
 		if n == 0 {
+			if len(f.buf) > maxBuffered {
+				// The head of the buffer asks for more bytes than any
+				// message labview knows, so its length cannot be trusted.
+				return out, ErrUnframed
+			}
 			return out, nil // need more bytes
 		}
 		msg := Message{Bytes: append([]byte(nil), f.buf[:n]...), IsInput: !forward}
@@ -185,16 +214,52 @@ func (f *InputFilter) next() (int, bool, error) {
 	case msgKeyEvent:
 		return needed(f.buf, 8, false)
 	case msgPointerEvent:
+		// The extended form carries a second button byte and sets the marker
+		// bit in the first one.
+		if len(f.buf) < 2 {
+			return 0, false, nil
+		}
+		if f.buf[1]&extendedPointerMark != 0 {
+			return needed(f.buf, 7, false)
+		}
 		return needed(f.buf, 6, false)
 	case msgClientCutText:
 		if len(f.buf) < 8 {
 			return 0, false, nil
 		}
-		length := int(binary.BigEndian.Uint32(f.buf[4:8]))
+		// The length is signed. A negative one means the extended clipboard,
+		// and its magnitude is the length that follows.
+		length := int(int32(binary.BigEndian.Uint32(f.buf[4:8])))
 		if length < 0 {
-			return 0, false, ErrUnframed
+			length = -length
 		}
 		return needed(f.buf, 8+length, false)
+	case msgEnableContinuousUpdates:
+		return needed(f.buf, 10, true)
+	case msgClientFence:
+		if len(f.buf) < 9 {
+			return 0, false, nil
+		}
+		return needed(f.buf, 9+int(f.buf[8]), true)
+	case msgXvpOp:
+		// An xvp operation shuts down, reboots or resets the machine, so it
+		// is input by any reading of the lease.
+		return needed(f.buf, 4, false)
+	case msgSetDesktopSize:
+		if len(f.buf) < 8 {
+			return 0, false, nil
+		}
+		// Resizing the guest's screen changes the machine, so it is input.
+		return needed(f.buf, 8+16*int(f.buf[6]), false)
+	case msgQEMU:
+		if len(f.buf) < 2 {
+			return 0, false, nil
+		}
+		if f.buf[1] != subQEMUExtendedKeyEvent {
+			// Another QEMU sub-message, of unknown length.
+			return 0, false, ErrUnframed
+		}
+		return needed(f.buf, 12, false)
 	default:
 		// An extension the filter does not know. Its length is unknown, so
 		// the stream can no longer be split reliably.
