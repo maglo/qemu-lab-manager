@@ -255,6 +255,13 @@ Ctrl+Alt+Del, full screen, take or release control, back to wall.
 tile is a serial tail, and expanding opens on the serial tab instead of
 console. Same view, different default.
 
+A console is one TCP dial per websocket, so a restart of the machine ends the
+session. The renderer dials again on a backoff, which is what the serial
+broker does on the server: both channels come back by themselves, and a power
+operation needs no reload. While a console is not connected the pane says so,
+because noVNC keeps the last frame it painted and a still picture is
+indistinguishable from a quiet machine.
+
 Beyond roughly eight tiles, every live RFB session is a decoder running in
 one browser tab. At that point the wall switches to periodic screenshots and
 opens RFB only on click. The tile is a component that renders either, so

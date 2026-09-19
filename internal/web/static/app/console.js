@@ -8,12 +8,21 @@ import RFB from '/vendor/novnc/core/rfb.js';
 import { api, ws } from './api.js';
 import { el } from './dom.js';
 
+// How long to wait before dialling again, and the ceiling it doubles to.
+const RECONNECT_MS = 1000;
+const RECONNECT_MAX_MS = 15000;
+
 // RFBRenderer wraps one noVNC session.
 //
 // The session belongs to the renderer, not to wherever it is currently
 // displayed. Expanding a machine moves the element into the viewport and
 // leaves the session alone, so there is no reconnect and no second handshake
 // (design section 7).
+//
+// A console is one TCP dial per websocket, so anything that ends the dial
+// ends the session: a restart of the machine, a restart of QEMU, a network
+// blip. The renderer therefore dials again by itself, which is what the
+// serial broker already does on the server (design section 7).
 export class RFBRenderer {
   constructor(machine, { onState } = {}) {
     this.machine = machine;
@@ -21,21 +30,31 @@ export class RFBRenderer {
     this.element = el('div', { class: 'rfb-host' });
     this.rfb = null;
     this.state = 'connecting';
+    // The lease is held by the view, not by the session, so the renderer
+    // remembers it and every new session starts the way the last one ended.
+    this.viewOnly = true;
+    this.stopped = false;
+    this.timer = null;
+    this.backoff = RECONNECT_MS;
   }
 
   connect() {
-    if (this.rfb) return;
+    if (this.rfb || this.stopped) return;
     try {
       this.rfb = new RFB(this.element, ws.console(this.machine.id), { shared: true });
     } catch (err) {
       this.setState('failed', String(err));
+      this.retry();
       return;
     }
 
     // View-only until the lease says otherwise. The server enforces the
     // same rule, so this is the UI agreeing with it rather than the only
     // thing standing between a viewer and the keyboard.
-    this.rfb.viewOnly = true;
+    this.rfb.viewOnly = this.viewOnly;
+    // Click focus follows the lease, so the framebuffer takes the keyboard
+    // when clicking it is the obvious thing to do and never before.
+    this.rfb.focusOnClick = !this.viewOnly;
     // Scale to whatever container it is in, so moving between a tile and
     // the viewport needs no reconnect.
     this.rfb.scaleViewport = true;
@@ -43,25 +62,45 @@ export class RFBRenderer {
     this.rfb.resizeSession = false;
     this.rfb.background = '#000';
     this.rfb.showDotCursor = true;
-    // Click focus follows the lease, so the framebuffer takes the keyboard
-    // when clicking it is the obvious thing to do and never before.
-    this.rfb.focusOnClick = false;
 
-    this.rfb.addEventListener('connect', () => this.setState('connected'));
+    this.rfb.addEventListener('connect', () => {
+      this.backoff = RECONNECT_MS;
+      this.setState('connected');
+    });
     this.rfb.addEventListener('disconnect', (ev) => {
       this.rfb = null;
-      this.setState('disconnected', ev.detail?.clean ? '' : 'connection lost');
+      if (this.stopped) return;
+      if (this.refused) {
+        this.setState('failed', this.refused);
+        return;
+      }
+      this.setState('reconnecting', ev.detail?.clean ? '' : 'connection lost');
+      this.retry();
     });
     this.rfb.addEventListener('securityfailure', (ev) => {
-      this.setState('failed', ev.detail?.reason || 'the console refused the connection');
+      // A console that refuses the connection refuses the next one too, so
+      // this is the one failure the renderer does not dial again.
+      this.refused = ev.detail?.reason || 'the console refused the connection';
+      this.setState('failed', this.refused);
     });
     this.rfb.addEventListener('desktopname', (ev) => {
       this.desktopName = ev.detail?.name;
     });
   }
 
+  retry() {
+    if (this.stopped || this.timer) return;
+    const wait = this.backoff;
+    this.backoff = Math.min(this.backoff * 2, RECONNECT_MAX_MS);
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      this.connect();
+    }, wait);
+  }
+
   setState(state, detail = '') {
     this.state = state;
+    this.detail = detail;
     this.onState(state, detail);
   }
 
@@ -69,6 +108,7 @@ export class RFBRenderer {
   // reconnect: the same session simply starts forwarding input, which the
   // server accepts because the lease is held.
   setViewOnly(viewOnly) {
+    this.viewOnly = viewOnly;
     if (!this.rfb) return;
     this.rfb.viewOnly = viewOnly;
     this.rfb.focusOnClick = !viewOnly;
@@ -83,6 +123,9 @@ export class RFBRenderer {
   }
 
   destroy() {
+    this.stopped = true;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
     if (this.rfb) {
       this.rfb.disconnect();
       this.rfb = null;
