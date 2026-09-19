@@ -314,3 +314,247 @@ func TestSplitKeepsFramingAcrossLeaseChange(t *testing.T) {
 		t.Fatalf("framing lost across the lease change: got %x", out)
 	}
 }
+
+// Builders for the extension messages. QEMU offers these and the vendored
+// noVNC accepts them, so a real session is full of them.
+
+func qemuExtendedKeyEvent(keysym, keycode uint32) []byte {
+	b := make([]byte, 12)
+	b[0] = msgQEMU
+	b[1] = subQEMUExtendedKeyEvent
+	binary.BigEndian.PutUint16(b[2:4], 1) // down
+	binary.BigEndian.PutUint32(b[4:8], keysym)
+	binary.BigEndian.PutUint32(b[8:12], keycode)
+	return b
+}
+
+func extendedPointerEvent() []byte {
+	b := make([]byte, 7)
+	b[0] = msgPointerEvent
+	b[1] = extendedPointerMark
+	return b
+}
+
+func extendedClipboard(payload int) []byte {
+	b := make([]byte, 8+payload)
+	b[0] = msgClientCutText
+	binary.BigEndian.PutUint32(b[4:8], uint32(int32(-payload)))
+	return b
+}
+
+func clientFence(payload int) []byte {
+	b := make([]byte, 9+payload)
+	b[0] = msgClientFence
+	b[8] = byte(payload)
+	return b
+}
+
+func enableContinuousUpdates() []byte {
+	b := make([]byte, 10)
+	b[0] = msgEnableContinuousUpdates
+	return b
+}
+
+func xvpOp() []byte {
+	b := make([]byte, 4)
+	b[0] = msgXvpOp
+	return b
+}
+
+func setDesktopSize(screens int) []byte {
+	b := make([]byte, 8+16*screens)
+	b[0] = msgSetDesktopSize
+	b[6] = byte(screens)
+	return b
+}
+
+// The key message of a real session. QEMU offers the extended key event and
+// noVNC then sends every key as message 255, so a filter that does not know it
+// loses the framing on the first key press and takes the console with it
+// (https://github.com/maglo/qemu-lab-manager/issues/51).
+func TestQEMUExtendedKeyEventIsInput(t *testing.T) {
+	f := NewInputFilter()
+	f.Filter(handshake())
+
+	in := concat(framebufferUpdateRequest(), qemuExtendedKeyEvent(0xFF52, 0x48))
+	out, err := f.Filter(in)
+	if err != nil {
+		t.Fatalf("Filter: %v", err)
+	}
+	if !bytes.Equal(out, framebufferUpdateRequest()) {
+		t.Fatalf("out = %x, want the update request alone", out)
+	}
+	if f.Dropped() != 1 {
+		t.Fatalf("dropped = %d, want 1", f.Dropped())
+	}
+}
+
+// A sub-message the filter does not know has no length it can trust.
+func TestUnknownQEMUSubMessageFailsClosed(t *testing.T) {
+	f := NewInputFilter()
+	f.Filter(handshake())
+
+	if _, err := f.Filter([]byte{msgQEMU, 1, 0, 0}); !errors.Is(err, ErrUnframed) {
+		t.Fatalf("error = %v, want ErrUnframed", err)
+	}
+}
+
+// The extended mouse button encoding adds a byte and marks the button mask.
+// Reading it as the six byte form takes the next message's first byte with it.
+func TestExtendedPointerEventIsInput(t *testing.T) {
+	f := NewInputFilter()
+	f.Filter(handshake())
+
+	out, err := f.Filter(concat(extendedPointerEvent(), framebufferUpdateRequest()))
+	if err != nil {
+		t.Fatalf("Filter: %v", err)
+	}
+	if !bytes.Equal(out, framebufferUpdateRequest()) {
+		t.Fatalf("out = %x, want the update request alone", out)
+	}
+}
+
+// The six byte form still reads as six bytes.
+func TestPlainPointerEventStillSixBytes(t *testing.T) {
+	f := NewInputFilter()
+	f.Filter(handshake())
+
+	msgs, err := f.Split(concat(pointerEvent(), framebufferUpdateRequest()))
+	if err != nil {
+		t.Fatalf("Split: %v", err)
+	}
+	if len(msgs) != 2 || len(msgs[0].Bytes) != 6 {
+		t.Fatalf("msgs = %d, first = %d bytes", len(msgs), len(msgs[0].Bytes))
+	}
+}
+
+// The extended clipboard writes its length as a negative number. Read as
+// unsigned it asks for four gigabytes, and the filter then waits for bytes
+// that never arrive, which stalls the whole client stream.
+func TestExtendedClipboardNegativeLength(t *testing.T) {
+	f := NewInputFilter()
+	f.Filter(handshake())
+
+	msgs, err := f.Split(concat(extendedClipboard(12), framebufferUpdateRequest()))
+	if err != nil {
+		t.Fatalf("Split: %v", err)
+	}
+	if len(msgs) != 2 {
+		t.Fatalf("msgs = %d, want 2", len(msgs))
+	}
+	if len(msgs[0].Bytes) != 20 || !msgs[0].IsInput {
+		t.Fatalf("clipboard message = %d bytes, input = %v", len(msgs[0].Bytes), msgs[0].IsInput)
+	}
+	if !bytes.Equal(msgs[1].Bytes, framebufferUpdateRequest()) {
+		t.Fatalf("second message = %x", msgs[1].Bytes)
+	}
+}
+
+// A length field nobody can satisfy must not hold bytes for ever.
+func TestOversizedMessageLosesFraming(t *testing.T) {
+	f := NewInputFilter()
+	f.Filter(handshake())
+
+	head := make([]byte, 8)
+	head[0] = msgClientCutText
+	binary.BigEndian.PutUint32(head[4:8], 1<<30)
+	if _, err := f.Filter(head); err != nil {
+		t.Fatalf("a long message is not an error until the bytes run out: %v", err)
+	}
+	var err error
+	for i := 0; i < 8 && err == nil; i++ {
+		_, err = f.Filter(make([]byte, 1<<20))
+	}
+	if !errors.Is(err, ErrUnframed) {
+		t.Fatalf("error = %v, want ErrUnframed", err)
+	}
+}
+
+// Viewing traffic from the extensions passes while the lease is elsewhere. A
+// fence reply and a continuous update request change nothing on the machine.
+func TestExtensionViewingTrafficForwarded(t *testing.T) {
+	f := NewInputFilter()
+	f.Filter(handshake())
+
+	in := concat(clientFence(4), enableContinuousUpdates())
+	out, err := f.Filter(in)
+	if err != nil {
+		t.Fatalf("Filter: %v", err)
+	}
+	if !bytes.Equal(out, in) {
+		t.Fatalf("out = %x, want the input unchanged", out)
+	}
+}
+
+// An xvp operation powers the machine and a resize changes its screen, so
+// both are input and both wait for the lease.
+func TestXvpAndResizeAreInput(t *testing.T) {
+	f := NewInputFilter()
+	f.Filter(handshake())
+
+	msgs, err := f.Split(concat(xvpOp(), setDesktopSize(1)))
+	if err != nil {
+		t.Fatalf("Split: %v", err)
+	}
+	if len(msgs) != 2 {
+		t.Fatalf("msgs = %d, want 2", len(msgs))
+	}
+	for i, m := range msgs {
+		if !m.IsInput {
+			t.Fatalf("message %d is not input", i)
+		}
+	}
+	if len(msgs[1].Bytes) != 24 {
+		t.Fatalf("set desktop size = %d bytes, want 24", len(msgs[1].Bytes))
+	}
+}
+
+// The regression this file exists for: a session as noVNC drives it against
+// QEMU, chunked the way a websocket delivers it. The filter must keep the
+// framing from the first byte to the last, because the update requests share
+// the connection with the keys. Lose the framing and the console closes, which
+// stops the requests and freezes the picture
+// (https://github.com/maglo/qemu-lab-manager/issues/51,
+// https://github.com/maglo/qemu-lab-manager/issues/52).
+func TestNoVNCSessionKeepsFraming(t *testing.T) {
+	session := concat(
+		handshake(),
+		setPixelFormat(),
+		setEncodings(20),
+		framebufferUpdateRequest(),
+		qemuExtendedKeyEvent(0xFF52, 0x48),
+		framebufferUpdateRequest(),
+		extendedPointerEvent(),
+		framebufferUpdateRequest(),
+		extendedClipboard(9),
+		qemuExtendedKeyEvent(0xFF54, 0x50),
+		framebufferUpdateRequest(),
+	)
+
+	rng := rand.New(rand.NewSource(7))
+	for trial := 0; trial < 50; trial++ {
+		f := NewInputFilter()
+		var requests int
+		for off := 0; off < len(session); {
+			size := 1 + rng.Intn(23)
+			if off+size > len(session) {
+				size = len(session) - off
+			}
+			msgs, err := f.Split(session[off : off+size])
+			if err != nil {
+				t.Fatalf("trial %d: framing lost at offset %d: %v", trial, off, err)
+			}
+			for _, m := range msgs {
+				if !m.IsInput && len(m.Bytes) == 10 && m.Bytes[0] == msgFramebufferUpdateRequest {
+					requests++
+				}
+			}
+			off += size
+		}
+		// Every update request reaches the machine. That is what keeps the
+		// framebuffer following the guest.
+		if requests != 4 {
+			t.Fatalf("trial %d: forwarded %d update requests, want 4", trial, requests)
+		}
+	}
+}

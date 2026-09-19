@@ -106,6 +106,25 @@ developer from typing into a VM mid-test, and it needs no special
 run, so two runs of one harness never contend for one machine. Section 10
 gives the form of that name and says who issues it.
 
+The server holds the console to the same rule. `internal/rfb` splits the
+browser's byte stream into messages and forwards input only while the lease is
+held, so a second tab or a scripted client cannot type either. That parser
+needs the length of every client message, and the length comes from a table of
+message types.
+
+The table is therefore coupled to two things: the RFB extensions that QEMU
+offers, and the vendored noVNC that accepts them. QEMU offers the extended key
+event, so noVNC sends a key as message 255 and not message 4. It offers the
+extended mouse buttons, so a pointer event carries seven bytes and not six.
+The extended clipboard writes its length as a negative number. A filter that
+does not know one of these cannot find the next boundary.
+
+A message the filter does not know fails closed, because forwarding unparsed
+bytes would defeat the lease. Failing closed ends the connection, and the
+browser's framebuffer update requests travel on that connection, so the
+picture stops with the keyboard. That is the price of the rule, and it is the
+reason the table is reviewed whenever the vendored noVNC changes.
+
 ---
 
 ## 5. HTTP surface
@@ -227,7 +246,9 @@ liveness dot. Machines without a console show why.
 **Expanded.** One machine fills the viewport, tabbed — see §8 for what the
 tabs hold. Console is the default tab and shows the same RFB session as the
 tile, with `viewOnly` flipped off once the lease is held, so there is no
-reconnect and no second handshake. A control row sits above the tabs: send
+reconnect and no second handshake. Click focus follows the lease with it, so
+clicking the framebuffer takes the keyboard exactly when the framebuffer is
+drivable. A control row sits above the tabs: send
 Ctrl+Alt+Del, full screen, take or release control, back to wall.
 
 **Serial-only.** Some machines have no framebuffer worth showing. Their

@@ -3,11 +3,21 @@
 
 Enough to prove that labview's console proxy, its RFB input filter and the
 vendored noVNC all agree on the protocol.
+
+The server offers the two pseudo-encodings that QEMU offers, because noVNC
+sends different messages once it has them: keys become message 255 and pointer
+events grow a byte. A fake that offers neither tests a client that the lab
+never runs (https://github.com/maglo/qemu-lab-manager/issues/51).
 """
 import socket, struct, sys, threading, time
 
 W, H = 640, 480
 NAME = b"fake-el9-build"
+
+# The pseudo-encodings QEMU offers. A server announces one as a rectangle in a
+# framebuffer update.
+PSEUDO_QEMU_EXT_KEY_EVENT = -258
+PSEUDO_EXTENDED_MOUSE_BUTTONS = -316
 
 def pixel_format():
     # 32bpp, depth 24, little-endian, true colour, 8 bits each, shifts 16/8/0
@@ -41,6 +51,7 @@ def serve(conn, addr):
         print(f"[fakevnc] handshake complete with {addr}", flush=True)
 
         tick = 0
+        offered = False
         while True:
             head = recvn(conn, 1)
             if not head:
@@ -56,19 +67,42 @@ def serve(conn, addr):
                 recvn(conn, 9)
                 tick += 1
                 body = framebuffer(tick)
-                conn.sendall(struct.pack(">BxH", 0, 1) +
-                             struct.pack(">HHHHi", 0, 0, W, H, 0) + body)
+                rects = struct.pack(">HHHHi", 0, 0, W, H, 0) + body
+                count = 1
+                if not offered:
+                    # Announce what this server supports, as QEMU does, before
+                    # the first picture.
+                    offered = True
+                    count = 3
+                    rects = (struct.pack(">HHHHi", 0, 0, 0, 0,
+                                         PSEUDO_QEMU_EXT_KEY_EVENT) +
+                             struct.pack(">HHHHi", 0, 0, 0, 0,
+                                         PSEUDO_EXTENDED_MOUSE_BUTTONS) +
+                             rects)
+                conn.sendall(struct.pack(">BxH", 0, count) + rects)
             elif msg == 4:    # KeyEvent -- must never arrive without a lease
                 recvn(conn, 7)
                 print("[fakevnc] INPUT KeyEvent received", flush=True)
-            elif msg == 5:    # PointerEvent
-                recvn(conn, 5)
+            elif msg == 5:    # PointerEvent, six bytes or seven
+                mask = recvn(conn, 1)
+                recvn(conn, 4)
+                if mask and mask[0] & 0x80:
+                    recvn(conn, 1)
                 print("[fakevnc] INPUT PointerEvent received", flush=True)
             elif msg == 6:    # ClientCutText
                 rest = recvn(conn, 7)
-                n = struct.unpack(">I", rest[3:7])[0]
+                # The length is signed: the extended clipboard writes it
+                # negative, and its magnitude is what follows.
+                n = abs(struct.unpack(">i", rest[3:7])[0])
                 recvn(conn, n)
                 print("[fakevnc] INPUT ClientCutText received", flush=True)
+            elif msg == 255:  # QEMU client message
+                sub = recvn(conn, 1)
+                if not sub or sub[0] != 0:
+                    print(f"[fakevnc] unknown QEMU sub-message {sub}", flush=True)
+                    return
+                recvn(conn, 10)
+                print("[fakevnc] INPUT QEMUExtendedKeyEvent received", flush=True)
             else:
                 print(f"[fakevnc] unknown client message {msg}", flush=True)
                 return

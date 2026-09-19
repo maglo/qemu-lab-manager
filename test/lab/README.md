@@ -32,7 +32,7 @@ So this drives the real thing and asserts on what a developer would see.
 
 | File | Role |
 |---|---|
-| `fakevnc.py` | RFB 3.8 server: handshake, one framebuffer, and it logs any input it receives — which is how "a viewer cannot type" is checked |
+| `fakevnc.py` | RFB 3.8 server: handshake, one framebuffer, the two pseudo-encodings QEMU offers, and it logs any input it receives — which is how "a viewer cannot type" is checked |
 | `fakeserial.py` | A unix socket that prints a boot with ANSI colour, then echoes what is typed at it |
 | `fakeqmp.py` | A unix socket that answers QMP: `send-key`, and `screendump` that writes a real PNG |
 | `proxy.js` | Stands in for design section 10: terminates the browser's connection, asserts `X-Forwarded-User`, forwards the original `Host` |
@@ -42,6 +42,26 @@ So this drives the real thing and asserts on what a developer would see.
 `run.sh` copies `machines/` to a temporary directory. The checks write a new
 machine file there and delete it again, which is how "labview follows the
 directory" is checked.
+
+## The fake VNC server offers what QEMU offers
+
+`fakevnc.py` announces the QEMU extended key event and the extended mouse
+buttons, because noVNC sends different messages once a server offers them: a
+key becomes client message 255 instead of 4, and a pointer event grows a
+seventh byte. A fake that offers neither exercises a client the lab never
+runs, and labview's input filter closed the console on the first key press of
+every real session while every check here passed.
+
+The console keyboard is checked through the lease clock. A successful key is
+not logged, so `drive.js` samples the lease expiry, presses one key over the
+framebuffer and samples again: input that reaches the server pushes the expiry
+out. The click that focuses the framebuffer comes before the first sample,
+because a pointer event is input as well and would renew the lease on its own.
+
+The second check is that the canvas is still there afterwards. noVNC removes
+it when the connection closes, and the connection carries the framebuffer
+update requests, so a console that survives a key press is a console that is
+still drawing.
 
 ## The fake QMP socket
 
