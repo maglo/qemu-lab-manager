@@ -151,7 +151,20 @@ another, and neither gets a privileged path.
 | `GET /` | The browser application |
 
 This table is the list. A reader who wants to know what labview serves reads
-it here and nowhere else.
+it here and nowhere else. A path under `/api/` or `/ws/` that is not in it
+answers 404 with the same error body every other failure has, and a known
+endpoint reached with the wrong method answers 405.
+
+`GET /` is the browser application, and its routes are deep links such as
+`/machine/el9-build/serial`. Those load the application. A request that names
+a file that is not there is a miss, not a route: it answers 404. Serving the
+application in its place returns a page with a 200 for a missing module, and
+the browser then reports the miss as a parse error on the wrong file.
+
+A browser says which it is asking for. `Sec-Fetch-Mode` is `navigate` for a
+page and something else for a module, a stylesheet or an image, so every
+request the application makes for itself is answered exactly. A client that
+sends no fetch headers is judged by the path, because a route names no file.
 
 The serial endpoint takes `?write=1` to request the lease at attach time,
 which is what a harness wants. Without it, attach is read-only.

@@ -266,6 +266,14 @@ async function tileCount(page, want) {
   check(shot.status() === 200 && shot.headers()['content-type'] === 'image/png' && magic === 'PNG',
     `screendump answers with a PNG (${shot.status()}, ${magic})`);
 
+  // A path that is not an endpoint says so, rather than answering with the
+  // application and a 200
+  // (https://github.com/maglo/qemu-lab-manager/issues/53).
+  for (const missing of ['/api/nonsense', '/vendor/xterm/xterm.js.map', '/app/does-not-exist.js']) {
+    const res = await page.request.get(`${BASE}${missing}`);
+    check(res.status() === 404, `${missing} answers 404 (got ${res.status()})`);
+  }
+
   // A machine with no control socket says it has none rather than failing.
   const none = await page.request.get(`${BASE}/api/machines/no-console/screenshot`);
   check(none.status() === 501, `a machine with no control socket answers 501 (got ${none.status()})`);
