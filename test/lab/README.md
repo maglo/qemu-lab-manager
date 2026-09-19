@@ -63,6 +63,11 @@ it when the connection closes, and the connection carries the framebuffer
 update requests, so a console that survives a key press is a console that is
 still drawing.
 
+`fakevnc.py` also takes one line on the port above the one it serves, and
+closes every console connection when it gets one. That is what a restart of
+QEMU looks like from the browser, and it is how "the console comes back
+without a reload" is checked.
+
 ## The fake QMP socket
 
 `fakeqmp.py` writes an asynchronous `event` line before every reply. QEMU

@@ -5,6 +5,8 @@ const BASE = process.env.LABVIEW_URL || 'http://127.0.0.1:18081';
 // The wall in screenshot mode is a second labview, because the mode is a flag.
 const SHOT_URL = process.env.SHOT_URL || 'http://127.0.0.1:18082';
 const OUT = process.env.SHOTS_DIR || __dirname + '/shots';
+// The fake VNC server's control port, one above the port it serves.
+const VNC_CONTROL_PORT = Number(process.env.VNC_CONTROL_PORT || 15902);
 const fs = require('fs');
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -34,6 +36,29 @@ async function onlyPanelVisible(page, tab) {
 async function postKeys(page, id, keys) {
   const res = await page.request.post(`${BASE}/api/machines/${id}/keys`, { data: { keys } });
   return { status: res.status(), body: await res.json() };
+}
+
+// dropConsoles asks the fake VNC server to close every console connection.
+// One line on its control port is enough.
+function dropConsoles() {
+  const net = require('net');
+  return new Promise((resolve, reject) => {
+    const sock = net.connect(VNC_CONTROL_PORT, '127.0.0.1');
+    sock.on('data', () => { sock.end(); resolve(); });
+    sock.on('error', reject);
+    sock.setTimeout(5000, () => { sock.destroy(); reject(new Error('fakevnc control timed out')); });
+  });
+}
+
+// waitFor polls a condition, because the reconnect is on a backoff and the
+// wall is on a poll. It returns whether the condition came true.
+async function waitFor(page, cond, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await cond()) return true;
+    await page.waitForTimeout(250);
+  }
+  return false;
 }
 
 // leaseExpiry reads the lease expiry of a machine, in milliseconds.
@@ -213,6 +238,25 @@ async function tileCount(page, want) {
   // (https://github.com/maglo/qemu-lab-manager/issues/52).
   const stillThere = await page.$$('#console-host canvas');
   check(stillThere.length >= 1, 'the framebuffer session survives a key press');
+
+  // --- the console comes back by itself ---
+  //
+  // The fake VNC drops the connection on request, which is what a restart of
+  // QEMU looks like from the browser. noVNC removes its canvas when the
+  // connection closes, so the canvas coming back is the reconnect
+  // (https://github.com/maglo/qemu-lab-manager/issues/54).
+  await dropConsoles();
+  const noted = await waitFor(page, async () =>
+    /console lost|connecting again/.test(await page.textContent('#console-host') || ''));
+  check(noted, 'the pane says the console dropped rather than showing a still picture');
+  await page.screenshot({ path: `${OUT}/05-console-dropped.png` });
+
+  const back = await waitFor(page, async () =>
+    (await page.$$('#console-host canvas')).length >= 1, 30000);
+  check(back, 'the console reconnects without a page reload');
+  const cleared = await waitFor(page, async () =>
+    !/console lost/.test(await page.textContent('#console-host') || ''));
+  check(cleared, 'the note clears once the console is back');
 
   // --- the control channel: a chord over QMP, and a capture ---
   const chord = await postKeys(page, 'el9-build', ['ctrl', 'alt', 'f3']);

@@ -1,0 +1,8 @@
+---
+bugfixes:
+  - "web - the console dials again after the connection closes, so a power
+    operation no longer leaves the pane dark until a reload
+    (https://github.com/maglo/qemu-lab-manager/issues/54)."
+  - "web - the console pane reports that it lost the connection, instead of
+    showing the last frame as though it were live
+    (https://github.com/maglo/qemu-lab-manager/issues/54)."
