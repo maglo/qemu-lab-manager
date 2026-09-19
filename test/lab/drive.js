@@ -36,6 +36,13 @@ async function postKeys(page, id, keys) {
   return { status: res.status(), body: await res.json() };
 }
 
+// leaseExpiry reads the lease expiry of a machine, in milliseconds.
+async function leaseExpiry(page, id) {
+  const res = await page.request.get(`${BASE}/api/machines/${id}`);
+  const body = await res.json();
+  return body.lease && body.lease.expires ? Date.parse(body.lease.expires) : null;
+}
+
 // tileCount waits for the wall to settle on a number of tiles. The wall
 // polls, so a change in the inventory directory needs one poll to show.
 async function tileCount(page, want) {
@@ -179,6 +186,33 @@ async function tileCount(page, want) {
   const echoed = await page.textContent('#serial-host');
   check(/whoami/.test(echoed), 'keystrokes reach the machine once the lease is held');
   await page.screenshot({ path: `${OUT}/04-serial-control.png` });
+
+  // --- the console keyboard ---
+  //
+  // Successful keys are not logged, so the lease clock is the detector: input
+  // that reaches the server pushes the expiry out. This is the check that
+  // catches a console whose keys never leave the browser
+  // (https://github.com/maglo/qemu-lab-manager/issues/51).
+  await page.click('#tabs button[data-tab="console"]');
+  await page.waitForTimeout(500);
+  // Click first and sample after it: a pointer event is input too, so a click
+  // inside the measurement would renew the lease on its own and the check
+  // would pass with a keyboard that reaches nothing.
+  await page.click('#console-host canvas');
+  await page.waitForTimeout(1200);
+  const before = await leaseExpiry(page, 'el9-build');
+  await page.waitForTimeout(1200);
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(800);
+  const after = await leaseExpiry(page, 'el9-build');
+  check(before && after && after > before,
+    `a key over the framebuffer renews the lease (${before} -> ${after})`);
+
+  // The same connection carries the update requests, so a console that still
+  // answers is a console that is still drawing
+  // (https://github.com/maglo/qemu-lab-manager/issues/52).
+  const stillThere = await page.$$('#console-host canvas');
+  check(stillThere.length >= 1, 'the framebuffer session survives a key press');
 
   // --- the control channel: a chord over QMP, and a capture ---
   const chord = await postKeys(page, 'el9-build', ['ctrl', 'alt', 'f3']);

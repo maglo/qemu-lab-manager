@@ -43,6 +43,8 @@ export class RFBRenderer {
     this.rfb.resizeSession = false;
     this.rfb.background = '#000';
     this.rfb.showDotCursor = true;
+    // Click focus follows the lease, so the framebuffer takes the keyboard
+    // when clicking it is the obvious thing to do and never before.
     this.rfb.focusOnClick = false;
 
     this.rfb.addEventListener('connect', () => this.setState('connected'));
@@ -67,7 +69,9 @@ export class RFBRenderer {
   // reconnect: the same session simply starts forwarding input, which the
   // server accepts because the lease is held.
   setViewOnly(viewOnly) {
-    if (this.rfb) this.rfb.viewOnly = viewOnly;
+    if (!this.rfb) return;
+    this.rfb.viewOnly = viewOnly;
+    this.rfb.focusOnClick = !viewOnly;
   }
 
   sendCtrlAltDel() {
