@@ -1,0 +1,13 @@
+---
+bugfixes:
+  - "api - a path under /api/ or /ws/ that is not an endpoint answers 404
+    with a JSON body, and a known endpoint reached with the wrong method
+    answers 405 (https://github.com/maglo/qemu-lab-manager/issues/53)."
+  - "web - a missing asset answers 404, so a missing module no longer arrives
+    as an HTML page with a success status
+    (https://github.com/maglo/qemu-lab-manager/issues/53)."
+  - "web - the vendored xterm bundle names no source map, because the map is
+    not vendored (https://github.com/maglo/qemu-lab-manager/issues/53)."
+  - "web - the application names an icon, so a browser no longer asks for a
+    file labview does not serve
+    (https://github.com/maglo/qemu-lab-manager/issues/53)."

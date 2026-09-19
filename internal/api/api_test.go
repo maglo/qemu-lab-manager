@@ -23,6 +23,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/lease"
 	"github.com/maglo/qemu-lab-manager/labview/internal/qmp"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
+	"github.com/maglo/qemu-lab-manager/labview/internal/web"
 )
 
 // testInventory is one file per machine, as the inventory directory holds
@@ -62,6 +63,11 @@ type harness struct {
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
+
+	ui, err := web.Handler()
+	if err != nil {
+		t.Fatalf("web.Handler: %v", err)
+	}
 
 	dir := t.TempDir()
 	invDir := filepath.Join(dir, "inventory.d")
@@ -126,6 +132,10 @@ func newHarness(t *testing.T) *harness {
 		Control:   qmp.NewManager(qmp.Options{CaptureDir: shotDir, Dial: qemu.dial}),
 		Activity:  activity.New(50, log),
 		Log:       log,
+		// The browser application, because the routes only sit next to
+		// each other when it is there. Registering both is the case that
+		// the mux refuses if either pattern is written wrongly.
+		UI: ui,
 	})
 
 	h := &harness{srv: srv, fakeHost: fakeHost, leases: leases, brokers: brokers,
@@ -664,4 +674,68 @@ type slowHost struct{ *host.Fake }
 func (*slowHost) UnitState(ctx context.Context, m inventory.Machine) (host.Unit, error) {
 	<-ctx.Done()
 	return host.Unit{}, ctx.Err()
+}
+
+// An endpoint that does not exist says so. The browser application's fallback
+// used to catch these, so a mistyped or removed endpoint answered with an HTML
+// page and a 200 (https://github.com/maglo/qemu-lab-manager/issues/53).
+func TestUnknownEndpointIs404JSON(t *testing.T) {
+	h := newHarness(t)
+
+	for _, path := range []string{"/api/nonsense", "/api/machines/el9-build/nope", "/ws/nope/el9-build"} {
+		rec := h.do("GET", path, "alice", nil)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("%s: status = %d, want 404", path, rec.Code)
+		}
+		if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+			t.Errorf("%s: content type = %q", path, ct)
+		}
+		var body errorBody
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || body.Error == "" {
+			t.Errorf("%s: body = %q", path, rec.Body.String())
+		}
+	}
+}
+
+// A known endpoint reached with the wrong method still says which method it
+// takes, rather than claiming the endpoint is missing.
+func TestKnownEndpointWrongMethodIs405(t *testing.T) {
+	h := newHarness(t)
+
+	rec := h.do("POST", "/api/machines", "alice", nil)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want 405: %s", rec.Code, rec.Body)
+	}
+	if allow := rec.Header().Get("Allow"); allow != "GET" {
+		t.Errorf("Allow = %q, want GET", allow)
+	}
+
+	rec = h.do("GET", "/api/machines/el9-build/power", "alice", nil)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want 405: %s", rec.Code, rec.Body)
+	}
+	if allow := rec.Header().Get("Allow"); allow != "POST" {
+		t.Errorf("Allow = %q, want POST", allow)
+	}
+}
+
+// The application's routes and the API's paths sit in one mux, so a deep link
+// loads the application while a path under the API surface never does.
+func TestApplicationRoutesAndAPIPathsCoexist(t *testing.T) {
+	h := newHarness(t)
+
+	rec := h.do("GET", "/machine/el9-build/serial", "alice", nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "<html") {
+		t.Errorf("deep link: status = %d, body starts %.40q", rec.Code, rec.Body.String())
+	}
+
+	rec = h.do("GET", "/api/nonsense", "alice", nil)
+	if rec.Code != http.StatusNotFound || strings.Contains(rec.Body.String(), "<html") {
+		t.Errorf("unknown endpoint: status = %d, body starts %.40q", rec.Code, rec.Body.String())
+	}
+
+	rec = h.do("GET", "/api/machines", "alice", nil)
+	if rec.Code != http.StatusOK {
+		t.Errorf("a real endpoint still answers: status = %d", rec.Code)
+	}
 }
