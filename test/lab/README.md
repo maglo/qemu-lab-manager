@@ -100,6 +100,14 @@ insists you have control. Driving labview directly on `$PORT` instead of
 through the proxy reproduces that, which is worth knowing when a check
 suddenly fails on input delivery.
 
+## The console error policy
+
+`drive.js` fails the run on any console error it does not list as expected.
+That is what caught a content-security-policy breakage, and it is why the
+checks for 404 answers are worth reading twice: a path that the application
+asks for itself must exist, and the browser asks for `/favicon.ico` unless the
+page names an icon.
+
 ## Adding a check
 
 `drive.js` uses one helper worth knowing about. `newClient` wraps a websocket

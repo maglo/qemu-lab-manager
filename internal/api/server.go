@@ -105,9 +105,43 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/config", s.handleConfig)
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
 
+	// A path under the API surface is never a route of the browser
+	// application, so it answers as the API answers rather than falling
+	// through to index.html.
+	s.mux.HandleFunc("/api/", s.handleNoEndpoint)
+	s.mux.HandleFunc("/ws/", s.handleNoEndpoint)
+
 	if s.ui != nil {
-		s.mux.Handle("GET /", s.ui)
+		// Registered for every method, because a pattern that names one
+		// method cannot sit under the prefix patterns above: the mux
+		// refuses the pair as ambiguous. The UI handler answers the
+		// methods it serves.
+		s.mux.Handle("/", s.ui)
 	}
+}
+
+// handleNoEndpoint answers a request for an endpoint that does not exist.
+//
+// A client cannot tell a removed endpoint from a working one if the answer is
+// an HTML page with a 200, so this says what happened in the shape every other
+// error has.
+func (s *Server) handleNoEndpoint(w http.ResponseWriter, r *http.Request) {
+	// The mux answers 405 only while nothing else matches, and this matches
+	// everything under the prefix, so the method check lands here now.
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		if method == r.Method {
+			continue
+		}
+		probe := r.Clone(r.Context())
+		probe.Method = method
+		if _, pattern := s.mux.Handler(probe); pattern != "" && !strings.HasSuffix(pattern, "/") {
+			w.Header().Set("Allow", method)
+			writeError(w, http.StatusMethodNotAllowed,
+				"%s is not allowed on %q", r.Method, r.URL.Path)
+			return
+		}
+	}
+	writeError(w, http.StatusNotFound, "no endpoint %q", r.URL.Path)
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

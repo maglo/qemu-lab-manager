@@ -24,6 +24,10 @@ TypeScript and would need compiling.
     npm pack @xterm/xterm@X.Y.Z
     tar xzf xterm-xterm-X.Y.Z.tgz
     cp package/lib/xterm.js package/css/xterm.css package/LICENSE .
+    sed -i '/^\/\/# sourceMappingURL=/d' xterm.js
 
 Then update the version above. The source map is deliberately not vendored;
-it roughly doubles the size and is of no use in a lab.
+it roughly doubles the size and is of no use in a lab. The last step removes
+the comment that points at it, because a browser that follows the comment
+asks for a file labview does not serve and reports the miss as a parse error
+on the bundle. A test in `internal/web` fails if the comment comes back.

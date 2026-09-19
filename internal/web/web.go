@@ -9,6 +9,7 @@ import (
 	"embed"
 	"io/fs"
 	"net/http"
+	"path"
 	"strings"
 )
 
@@ -16,8 +17,13 @@ import (
 var content embed.FS
 
 // Handler serves the application: static assets by path, and index.html for
-// anything else so that a deep link like /machine/el9-build/logs loads the
-// app rather than 404ing.
+// a route so that a deep link like /machine/el9-build/logs loads the app
+// rather than 404ing.
+//
+// The fallback applies to a navigation and to nothing else. A missing module
+// answered with index.html and a 200 fails inside a parser as a syntax error
+// on the wrong file, which hides the one fact worth having: the file is not
+// there.
 func Handler() (http.Handler, error) {
 	root, err := fs.Sub(content, "static")
 	if err != nil {
@@ -31,13 +37,22 @@ func Handler() (http.Handler, error) {
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Allow", "GET, HEAD")
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
 		path := strings.TrimPrefix(r.URL.Path, "/")
 		if path == "" {
 			serveIndex(w, index)
 			return
 		}
 		if _, err := fs.Stat(root, path); err != nil {
-			// Not an asset: hand the route to the app.
+			if !isNavigation(r) {
+				http.NotFound(w, r)
+				return
+			}
+			// A route: hand it to the app.
 			serveIndex(w, index)
 			return
 		}
@@ -46,6 +61,22 @@ func Handler() (http.Handler, error) {
 		w.Header().Set("Cache-Control", "no-cache")
 		files.ServeHTTP(w, r)
 	}), nil
+}
+
+// isNavigation reports whether a request could be one of the app's routes.
+//
+// Two rules, and they answer the two ways the question arrives. A browser
+// says what it is fetching: Sec-Fetch-Mode is "navigate" for a page and
+// something else for a module, a stylesheet or an image, and that alone
+// settles every request the application itself makes. Anything else is judged
+// by the path: a route names no file, so a path with an extension is a miss
+// rather than a route. That keeps a deep link working for a client that sends
+// no fetch headers, such as curl.
+func isNavigation(r *http.Request) bool {
+	if mode := r.Header.Get("Sec-Fetch-Mode"); mode != "" {
+		return mode == "navigate"
+	}
+	return path.Ext(r.URL.Path) == ""
 }
 
 func serveIndex(w http.ResponseWriter, index []byte) {
