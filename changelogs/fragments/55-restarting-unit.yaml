@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - "api - a unit in activating reads as starting, so a machine that labview
+    restarts no longer reports as failed for as long as RestartSec lasts
+    (https://github.com/maglo/qemu-lab-manager/issues/55)."

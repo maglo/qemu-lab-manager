@@ -504,6 +504,13 @@ The VMs are systemd units. Using the unit matches how they are actually
 managed, reports a crashed machine as failed rather than merely absent, and
 needs no second control socket held open per machine.
 
+Liveness reads two properties, not one. `ActiveState` says what the unit is
+doing now and `Result` says how the last run ended. A unit with `Restart=`
+waits in `activating`/`auto-restart` between two runs and carries the previous
+`Result` through that wait, so a machine that labview restarted a second ago
+looks failed if `Result` alone decides. A unit that is activating is starting,
+whatever the run before it returned.
+
 Four rules:
 
 - Talk to systemd over its D-Bus API, not by shelling out to `systemctl`.

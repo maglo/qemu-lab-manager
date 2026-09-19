@@ -107,6 +107,13 @@ func unitWhy(u host.Unit) string {
 	switch {
 	case u.LoadState == "not-found":
 		return "systemd does not know this unit"
+	case u.Starting():
+		// auto-restart is the wait between two runs, so the machine is on
+		// its way back rather than broken.
+		if u.SubState == "auto-restart" {
+			return "unit is restarting"
+		}
+		return "unit is starting"
 	case u.Failed():
 		return "unit failed: " + strings.TrimSpace(u.SubState+" "+u.Result)
 	case u.ActiveState != "":

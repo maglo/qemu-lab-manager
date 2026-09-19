@@ -207,6 +207,25 @@ func TestUnitRunningAndFailed(t *testing.T) {
 	if (Unit{ActiveState: "active", Result: "success"}).Failed() {
 		t.Error("healthy unit reported failed")
 	}
+	// A unit with Restart= waits in activating/auto-restart between two
+	// runs, and it carries the previous run's Result through that wait. It
+	// is coming back, not broken
+	// (https://github.com/maglo/qemu-lab-manager/issues/55).
+	restarting := Unit{ActiveState: "activating", SubState: "auto-restart", Result: "exit-code"}
+	if restarting.Failed() {
+		t.Error("restarting unit reported failed")
+	}
+	if !restarting.Starting() {
+		t.Error("restarting unit not reported starting")
+	}
+	if (Unit{ActiveState: "activating", SubState: "start"}).Failed() {
+		t.Error("starting unit reported failed")
+	}
+	// The wait ends in one of the two states that are not activating, and
+	// both still read the way they did.
+	if !(Unit{ActiveState: "failed", SubState: "failed", Result: "exit-code"}).Failed() {
+		t.Error("unit that gave up not reported failed")
+	}
 }
 
 func asErrNoUnit(err error, target **ErrNoUnit) bool {
