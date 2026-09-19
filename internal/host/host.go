@@ -55,9 +55,21 @@ type Unit struct {
 func (u Unit) Running() bool { return u.ActiveState == "active" }
 
 // Failed reports whether systemd considers the unit failed.
+//
+// Result belongs to the run that ended, not to the state the unit is in now.
+// A unit with Restart=on-failure passes through activating/auto-restart on its
+// way back up, and it carries the previous run's Result through it, so Result
+// alone calls a machine that is coming back a failure.
 func (u Unit) Failed() bool {
+	if u.Starting() {
+		return false
+	}
 	return u.ActiveState == "failed" || u.Result != "" && u.Result != "success"
 }
+
+// Starting reports whether the unit is on its way up, which includes the
+// pause that Restart= puts between two runs.
+func (u Unit) Starting() bool { return u.ActiveState == "activating" }
 
 // Disk describes one backing image.
 type Disk struct {

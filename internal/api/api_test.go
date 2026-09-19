@@ -665,3 +665,61 @@ func (*slowHost) UnitState(ctx context.Context, m inventory.Machine) (host.Unit,
 	<-ctx.Done()
 	return host.Unit{}, ctx.Err()
 }
+
+// A restart that labview submits passes through activating/auto-restart for
+// as long as RestartSec says. The machine is coming back, and the wall must
+// not call that a failure
+// (https://github.com/maglo/qemu-lab-manager/issues/55).
+func TestRestartingUnitIsNotAFailure(t *testing.T) {
+	h := newHarness(t)
+	h.fakeHost.SetUnit("el9-build", host.Unit{
+		Name:        "qemu-el9-build.service",
+		LoadState:   "loaded",
+		ActiveState: "activating",
+		SubState:    "auto-restart",
+		// The property still holds the run that ended.
+		Result: "exit-code",
+	})
+
+	rec := h.do("GET", "/api/machines/el9-build", "alice", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body)
+	}
+	var body struct {
+		Live bool   `json:"live"`
+		Why  string `json:"why"`
+	}
+	json.Unmarshal(rec.Body.Bytes(), &body)
+
+	if body.Live {
+		t.Error("a machine in auto-restart is not up yet")
+	}
+	if strings.Contains(body.Why, "failed") {
+		t.Errorf("why = %q, want it to say the unit is restarting", body.Why)
+	}
+	if body.Why != "unit is restarting" {
+		t.Errorf("why = %q", body.Why)
+	}
+}
+
+// A unit that gave up still reads as failed.
+func TestFailedUnitStillReadsAsFailed(t *testing.T) {
+	h := newHarness(t)
+	h.fakeHost.SetUnit("el9-build", host.Unit{
+		Name:        "qemu-el9-build.service",
+		LoadState:   "loaded",
+		ActiveState: "failed",
+		SubState:    "failed",
+		Result:      "exit-code",
+	})
+
+	rec := h.do("GET", "/api/machines/el9-build", "alice", nil)
+	var body struct {
+		Live bool   `json:"live"`
+		Why  string `json:"why"`
+	}
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	if body.Live || !strings.Contains(body.Why, "failed") {
+		t.Errorf("live = %v, why = %q", body.Live, body.Why)
+	}
+}
