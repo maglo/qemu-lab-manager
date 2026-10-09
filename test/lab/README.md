@@ -111,6 +111,18 @@ A layout fault of this kind is invisible to every other check here. The tab
 renders, the output arrives and the status note carries the right text while
 the last rows of the terminal sit under the note.
 
+## The recording player
+
+The checks open a capture from the recordings tab and assert what a viewer
+would: a player appears, it replays what the machine printed, it says where it
+is in the capture, moving back rewinds the screen, and closing it leaves the
+list behind.
+
+The rewind check is the one with a reason behind it. A terminal is the sum of
+everything written to it, so a player that seeks backwards without resetting
+shows a later screen under an earlier clock, and every check that only looks
+for the recorded text still passes.
+
 ## The console error policy
 
 `drive.js` fails the run on any console error it does not list as expected.

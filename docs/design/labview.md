@@ -323,7 +323,19 @@ as inactive, and the developer reads the reason on the hypervisor. That is a
 deliberate trade, not an oversight.
 
 **Recordings** — past serial captures for this machine, one per run, with
-timestamps and sizes. Play in the browser or download.
+timestamps and sizes. A capture plays in the browser, in the same terminal the
+serial tab uses, or downloads as asciicast v2.
+
+A capture is a header and one line per output event, so replaying it needs a
+terminal and a clock and nothing else. labview vendors the terminal already,
+which is why the player is arithmetic rather than a second vendored player.
+
+Two rules come from what a capture of a lab machine looks like. A boot holds
+minutes where nothing is printed, so a gap longer than two seconds plays as two
+seconds and the player says how much waiting it closed up; real time would be a
+still screen. And a terminal is the sum of everything written to it, so moving
+backwards resets the terminal and replays from the start. That costs nothing
+worth measuring, because replaying without waiting is only writes.
 
 **Activity** — who attached when, who holds control, who held it before.
 Useful for "why did the VM reboot", less so day to day.

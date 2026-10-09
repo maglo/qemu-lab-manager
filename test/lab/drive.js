@@ -348,6 +348,33 @@ async function tileCount(page, want) {
   check(/download|capture/i.test(recs), 'recordings tab lists captures');
   await page.screenshot({ path: `${OUT}/06-recordings.png` });
 
+  // --- the player ---
+  //
+  // "view" used to hand the browser the same file "download" does, and a
+  // browser renders an asciicast as nothing, so both buttons downloaded
+  // (https://github.com/maglo/qemu-lab-manager/issues/64).
+  await page.click('#recordings .row .linklike');
+  check((await page.$$('.player')).length === 1, 'view opens a player');
+
+  const played = await waitFor(page, async () =>
+    /login:|AlmaLinux/.test(await page.textContent('.player-screen') || ''), 15000);
+  check(played, 'the player replays what the machine printed');
+  check(/\d+s \/ \d+s/.test(await page.textContent('.player-status') || ''),
+    'the player reports where it is in the capture');
+  await page.screenshot({ path: `${OUT}/07-player.png` });
+
+  // The screen is the sum of what came before, so moving back rebuilds it
+  // from the start rather than showing a later screen with an earlier clock.
+  const bar = await page.locator('.player-bar').boundingBox();
+  await page.mouse.click(bar.x + bar.width * 0.02, bar.y + bar.height / 2);
+  await page.waitForTimeout(400);
+  const rewound = await page.textContent('.player-screen');
+  check(!/login:/.test(rewound), 'moving back in the capture rewinds the screen');
+
+  await page.click('.player-head button:has-text("Close")');
+  check((await page.$$('.player')).length === 0, 'close takes the player away');
+  check((await page.$$('#recordings .row')).length > 0, 'the list of captures is still there');
+
   // --- activity ---
   await page.click('#tabs button[data-tab="activity"]');
   await page.waitForTimeout(1200);

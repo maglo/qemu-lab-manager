@@ -360,12 +360,43 @@ table.kv td { font-family: var(--mono); font-size: 12px; word-break: break-word;
 .copywrap + details { margin-top: 6px; }
 details summary { cursor: pointer; font-size: 12px; padding: 2px 0; }
 
-.row a {
+.row a, .row .linklike {
   color: var(--accent);
   text-decoration: none;
   font-size: 12px;
   padding: 2px 6px;
   border: 1px solid var(--line);
   border-radius: 4px;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
 }
-.row a:hover { border-color: var(--accent); }
+.row a:hover, .row .linklike:hover { border-color: var(--accent); }
+
+/* The recording player. It sits above the list of captures, so the list it
+   came from is still in view. */
+.player {
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.player-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.player-head strong { font-family: var(--mono); font-weight: 600; font-size: 12px; }
+.player-status { white-space: nowrap; }
+.player-screen { background: #000; padding: 4px; overflow: hidden; }
+.player-screen .xterm { width: 100%; }
+.player-bar {
+  height: 6px;
+  background: var(--panel-2);
+  cursor: pointer;
+}
+.player-bar-fill { height: 100%; width: 0; background: var(--accent); }
