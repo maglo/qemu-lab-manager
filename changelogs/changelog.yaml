@@ -1,4 +1,16 @@
 releases:
+  0.3.0:
+    release_date: '2026-10-09'
+    changes:
+      release_summary:
+      - 'A serial capture now plays in the browser. The recordings tab offered a view button that handed the browser a file it cannot render, so it downloaded the capture a second time and nothing in labview could play one. The player replays the output events in a terminal, it closes up the long waits of a boot and says how much it closed, and the track moves through the capture. The serial tab is also the size it should be: the terminal measured the padded box and kept the size it had before the status note took a line, so the last rows sat under the note.'
+      minor_changes:
+      - web - the recordings tab plays a capture in the browser. The player replays the output events on their own clock in a terminal, it closes up a gap longer than two seconds and says how much it closed, and the track moves through the capture (https://github.com/maglo/qemu-lab-manager/issues/64).
+      bugfixes:
+      - web - the console pane and the serial pane clip what they hold, so a renderer that measures itself wrong cannot push the page (https://github.com/maglo/qemu-lab-manager/issues/63).
+      - web - the serial terminal fits its pane. It measured the padded box and kept the size it had before the status note took a line, so the last rows sat under the note (https://github.com/maglo/qemu-lab-manager/issues/63).
+      - web - the serial terminal follows its pane when the pane changes size, not only when the window does (https://github.com/maglo/qemu-lab-manager/issues/63).
+      - web - the view button on a capture no longer hands the browser a file it cannot render, which downloaded the capture a second time (https://github.com/maglo/qemu-lab-manager/issues/64).
   0.2.1:
     release_date: '2026-10-09'
     changes:
