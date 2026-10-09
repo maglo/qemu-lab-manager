@@ -115,7 +115,7 @@ function shellQuote(arg) {
   return `'${arg.replace(/'/g, `'\\''`)}'`;
 }
 
-export function renderRecordings(host, machineID, recordings, { note } = {}) {
+export function renderRecordings(host, machineID, recordings, { note, onView } = {}) {
   clear(host);
   if (note) {
     host.append(el('p', { class: 'note warn', text: note }));
@@ -134,7 +134,12 @@ export function renderRecordings(host, machineID, recordings, { note } = {}) {
       el('time', { datetime: r.started || '', text: when(r.started) || r.name }),
       el('span', { class: 'what', text: bytes(r.size) }),
       el('span', { class: 'spacer' }),
-      el('a', { href: api.recordingURL(machineID, r.name, true), target: '_blank', rel: 'noopener' }, 'view'),
+      el('button', {
+        type: 'button',
+        class: 'linklike',
+        text: 'view',
+        onclick: () => onView?.(r),
+      }),
       el('a', { href: api.recordingURL(machineID, r.name), download: r.name }, 'download'))))));
 }
 

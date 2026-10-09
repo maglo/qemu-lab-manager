@@ -7,6 +7,7 @@
 import { api } from './api.js';
 import { Tile } from './tile.js';
 import { SerialView } from './serial.js';
+import { RecordingPlayer } from './player.js';
 import { renderDetails, renderRecordings, renderActivity } from './tabs.js';
 import { $, el, clear, toast, when } from './dom.js';
 
@@ -23,6 +24,7 @@ const state = {
   tab: 'console',
   record: null,      // last fetched whole record for the open machine
   serial: null,      // SerialView for the expanded serial tab
+  player: null,      // RecordingPlayer for the recordings tab
   haveControl: false,
   pollTimer: null,
 };
@@ -194,6 +196,7 @@ function closeMachine() {
     state.serial.destroy();
     state.serial = null;
   }
+  closePlayer();
   clear($('#console-host'));
 }
 
@@ -356,16 +359,35 @@ function paintSerialStatus(msg) {
 
 async function loadRecordings() {
   const host = $('#recordings');
+  closePlayer();
   if (!state.config.recordings) {
     renderRecordings(host, state.open, null, { note: 'Serial capture is disabled on this labview.' });
     return;
   }
   try {
     const { recordings } = await api.recordings(state.open);
-    renderRecordings(host, state.open, recordings);
+    renderRecordings(host, state.open, recordings, { onView: openPlayer });
   } catch (err) {
     renderRecordings(host, state.open, null, { note: `Could not list recordings: ${err.message}` });
   }
+}
+
+// openPlayer replays one capture above the list. One player at a time: a
+// second terminal running a second clock is two machines talking at once.
+function openPlayer(recording) {
+  closePlayer();
+  const player = new RecordingPlayer(state.open, recording, { onClose: closePlayer });
+  state.player = player;
+  $('#recordings').prepend(player.element);
+  player.element.scrollIntoView({ block: 'nearest' });
+  player.load();
+}
+
+function closePlayer() {
+  if (!state.player) return;
+  state.player.destroy();
+  state.player.element.remove();
+  state.player = null;
 }
 
 // --- controls ---------------------------------------------------------
