@@ -27,6 +27,17 @@ export class SerialView {
     });
     this.term.open(this.element);
 
+    // The terminal is sized from the box it sits in, and that box changes
+    // for reasons no resize event reports: the status note under it takes a
+    // line once the first status arrives, a tab opens, the pane goes full
+    // screen. Watching the element covers every one of them, including the
+    // first measurement once it is in the document
+    // (https://github.com/maglo/qemu-lab-manager/issues/63).
+    if (window.ResizeObserver) {
+      this.observer = new ResizeObserver(() => this.fit());
+      this.observer.observe(this.element);
+    }
+
     // Keystrokes go out as binary, because that is the only thing the
     // server treats as input. Whether they reach the machine depends on the
     // lease, which the server checks; a refusal comes back as a status
@@ -78,13 +89,23 @@ export class SerialView {
   // fit sizes the terminal to its container. Done by measuring a character
   // rather than pulling in the fit addon, which is one more vendored file
   // for a dozen lines of arithmetic.
+  //
+  // The arithmetic uses the content box. clientWidth and clientHeight count
+  // the padding, so dividing those by a cell gives a terminal wider and
+  // taller than the space it has, and the last row lands under the status
+  // note.
   fit() {
     const host = this.element;
-    if (!host.clientWidth || !host.clientHeight) return;
+    const style = getComputedStyle(host);
+    const width = host.clientWidth -
+      parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const height = host.clientHeight -
+      parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+    if (!(width > 0) || !(height > 0)) return;
     const dims = this.term._core?._renderService?.dimensions?.css?.cell;
     if (!dims || !dims.width || !dims.height) return;
-    const cols = Math.max(20, Math.floor(host.clientWidth / dims.width));
-    const rows = Math.max(4, Math.floor(host.clientHeight / dims.height));
+    const cols = Math.max(20, Math.floor(width / dims.width));
+    const rows = Math.max(4, Math.floor(height / dims.height));
     if (cols !== this.term.cols || rows !== this.term.rows) {
       this.term.resize(cols, rows);
     }
@@ -101,6 +122,10 @@ export class SerialView {
 
   destroy() {
     this.closed = true;
+    if (this.observer) {
+      this.observer.disconnect();
+      this.observer = null;
+    }
     if (this.socket) {
       this.socket.close();
       this.socket = null;

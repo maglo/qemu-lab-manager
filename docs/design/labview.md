@@ -268,6 +268,12 @@ Ctrl+Alt+Del, full screen, take or release control, back to wall.
 tile is a serial tail, and expanding opens on the serial tab instead of
 console. Same view, different default.
 
+A terminal has a size in rows and columns, so the serial pane measures its box
+and resizes the terminal to match. It watches the element rather than the
+window, because the box changes for reasons no resize event reports: the status
+note takes a line when the first status arrives, and a tab opens. The pane also
+clips, so a renderer that measures itself wrong spills nothing onto the page.
+
 A console is one TCP dial per websocket, so a restart of the machine ends the
 session. The renderer dials again on a backoff, which is what the serial
 broker does on the server: both channels come back by themselves, and a power

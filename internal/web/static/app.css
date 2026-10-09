@@ -204,7 +204,13 @@ button.ghost { background: transparent; }
    are markedly harder to scan than the same content in a column. */
 .panel.scroll > div { max-width: 1100px; }
 
-.console-host, .serial-host { flex: 1 1 auto; min-height: 0; background: #000; position: relative; }
+/* overflow is clipped, so a renderer that measures itself wrong spills
+   nothing onto the page. The terminal sizes itself from this box, and a box
+   that can grow turns a rounding error into a page-long scroll. */
+.console-host, .serial-host {
+  flex: 1 1 auto; min-height: 0; background: #000;
+  position: relative; overflow: hidden;
+}
 .console-host > * { width: 100%; height: 100%; }
 
 .note {

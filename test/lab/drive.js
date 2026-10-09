@@ -194,6 +194,49 @@ async function tileCount(page, want) {
   check(note.length > 0, `serial status note is rendered out of band (${JSON.stringify(note)})`);
   check(!/AlmaLinux/.test(note), 'status note does not contain VM output');
   check(!/"type"|scrollback of/.test(serialText.replace(/\s+/g,' ')) || true, 'status did not enter the byte stream');
+
+  // The terminal is sized from the box it sits in, and it must stay inside
+  // it. A terminal that measures itself against the padded box, or that keeps
+  // the size it had before the status note took a line, hangs over the note
+  // and pushes the pane
+  // (https://github.com/maglo/qemu-lab-manager/issues/63).
+  const fit = await page.evaluate(() => {
+    const rect = (sel) => document.querySelector(sel).getBoundingClientRect();
+    const xh = document.querySelector('#serial-host .xterm-host');
+    const style = getComputedStyle(xh);
+    const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    return {
+      content: xh.clientHeight - padding,
+      terminal: rect('#serial-host .xterm').height,
+      bottom: rect('#serial-host .xterm').bottom,
+      noteTop: rect('#serial-note').top,
+      pageOverflow: document.documentElement.scrollHeight - window.innerHeight,
+    };
+  });
+  check(fit.terminal <= fit.content + 0.5,
+    `the terminal fits its pane (${Math.round(fit.terminal)}px in ${Math.round(fit.content)}px)`);
+  check(fit.bottom <= fit.noteTop + 0.5, 'the terminal does not hang over the status note');
+  check(fit.pageOverflow <= 0,
+    `the expanded view does not scroll the page (overflow ${Math.round(fit.pageOverflow)}px)`);
+
+  // The pane follows the window. Nothing but the element's own size reports
+  // this, so the terminal watches it.
+  await page.setViewportSize({ width: 1100, height: 700 });
+  await page.waitForTimeout(800);
+  const refit = await page.evaluate(() => {
+    const xh = document.querySelector('#serial-host .xterm-host');
+    const style = getComputedStyle(xh);
+    const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    return {
+      content: xh.clientHeight - padding,
+      terminal: document.querySelector('#serial-host .xterm').getBoundingClientRect().height,
+    };
+  });
+  check(refit.terminal <= refit.content + 0.5,
+    `the terminal fits a smaller window (${Math.round(refit.terminal)}px in ${Math.round(refit.content)}px)`);
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.waitForTimeout(500);
+
   await page.screenshot({ path: `${OUT}/03-serial.png` });
 
   // --- take control ---

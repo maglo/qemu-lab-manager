@@ -100,6 +100,17 @@ insists you have control. Driving labview directly on `$PORT` instead of
 through the proxy reproduces that, which is worth knowing when a check
 suddenly fails on input delivery.
 
+## The serial pane is measured, not eyeballed
+
+The terminal takes its size from the box it sits in, and a browser check
+measures the result: the terminal must fit inside that box, it must not hang
+over the status note under it, and the expanded view must not scroll the page.
+The check runs again at a smaller window, because the pane follows the window.
+
+A layout fault of this kind is invisible to every other check here. The tab
+renders, the output arrives and the status note carries the right text while
+the last rows of the terminal sit under the note.
+
 ## The console error policy
 
 `drive.js` fails the run on any console error it does not list as expected.
