@@ -1,4 +1,20 @@
 releases:
+  0.2.1:
+    release_date: '2026-10-09'
+    changes:
+      release_summary:
+      - 'A fix release. The browser console works again: a key press reached nothing and froze the picture, because labview did not know the key message that noVNC sends to QEMU, and it closed the connection that carries the framebuffer update requests. The console also dials again by itself after a machine restarts, and it says when it is not connected instead of holding the last frame. A machine that labview restarts reads as starting, not as failed. A path that labview does not serve answers 404, so a missing module no longer arrives as a page with a success status.'
+      bugfixes:
+      - api - a path under /api/ or /ws/ that is not an endpoint answers 404 with a JSON body, and a known endpoint reached with the wrong method answers 405 (https://github.com/maglo/qemu-lab-manager/issues/53).
+      - api - a unit in activating reads as starting, so a machine that labview restarts no longer reports as failed for as long as RestartSec lasts (https://github.com/maglo/qemu-lab-manager/issues/55).
+      - rfb - the filter reads the extended clipboard length as signed, so a clipboard write no longer stalls the client stream (https://github.com/maglo/qemu-lab-manager/issues/51).
+      - rfb - the input filter knows the client messages that noVNC sends to QEMU, so a key press no longer closes the console (https://github.com/maglo/qemu-lab-manager/issues/51).
+      - web - a missing asset answers 404, so a missing module no longer arrives as an HTML page with a success status (https://github.com/maglo/qemu-lab-manager/issues/53).
+      - web - click focus on the framebuffer follows the write lease, so a session that lost focus takes it back with a click (https://github.com/maglo/qemu-lab-manager/issues/51).
+      - web - the application names an icon, so a browser no longer asks for a file labview does not serve (https://github.com/maglo/qemu-lab-manager/issues/53).
+      - web - the console dials again after the connection closes, so a power operation no longer leaves the pane dark until a reload (https://github.com/maglo/qemu-lab-manager/issues/54).
+      - web - the console pane reports that it lost the connection, instead of showing the last frame as though it were live (https://github.com/maglo/qemu-lab-manager/issues/54).
+      - web - the vendored xterm bundle names no source map, because the map is not vendored (https://github.com/maglo/qemu-lab-manager/issues/53).
   0.2.0:
     release_date: '2026-09-16'
     changes:
