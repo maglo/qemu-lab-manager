@@ -5,7 +5,9 @@ Rules for agents and humans who work in this repository.
 ## Repository
 
 qemu-lab-manager holds the tooling for the QEMU lab. It builds one Go binary,
-`labview`.
+`labview`. The product shape around that binary is a bootc lab cluster;
+[`docs/design/cluster.md`](docs/design/cluster.md) is the document of that
+shape.
 
 | Path | Content | Its document |
 |---|---|---|
@@ -13,10 +15,11 @@ qemu-lab-manager holds the tooling for the QEMU lab. It builds one Go binary,
 | `internal/` | The packages of the service. | [`labview.md`](docs/design/labview.md) |
 | `internal/web/static` | The browser application. | [`labview.md`](docs/design/labview.md) |
 | `docs/design/` | One document for each component and each process. | |
+| `docs/design/cluster.md` | The lab cluster product. | [`cluster.md`](docs/design/cluster.md) |
 | `docs/images/` | The pictures that `README.md` shows. | [`test/lab/README.md`](test/lab/README.md) |
 | `changelogs/` | The fragments and the released entries. | [`changelog.md`](docs/design/changelog.md) |
 | `test/lab` | The fake lab and the browser checks. | [`test/lab/README.md`](test/lab/README.md) |
-| `deploy/` | The systemd unit, the polkit rule and the nginx file. | [`labview.md`](docs/design/labview.md) |
+| `deploy/` | The systemd unit, the polkit rule and the nginx file. | [`labview.md`](docs/design/labview.md), [`cluster.md`](docs/design/cluster.md) |
 | `scripts/` | The check scripts. | [`checks.md`](docs/design/checks.md) |
 | `.github/workflows/` | The workflows. | [`checks.md`](docs/design/checks.md) |
 
