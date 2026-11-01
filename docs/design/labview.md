@@ -1,10 +1,13 @@
 # labview — design
 
 A console wall for the QEMU lab. Developers see every machine at a glance,
-open one to drive it, and attach to serial when a scenario needs it. One Go
-binary, one inventory directory, no database.
+open one to drive it, and attach to serial when a scenario needs it.
 
-Status: design only. Implementation happens elsewhere.
+The product around that wall is a bootc lab cluster with machine LCM,
+telemetry and scenarios. [`cluster.md`](cluster.md) is the document of
+that shape. This file stays the document of the wall, the lease, the
+serial broker, the HTTP surface and the local host access that already
+ship.
 
 ---
 
@@ -16,11 +19,15 @@ In:
 - Click a machine to expand it to the viewport and take control.
 - Attach to the graphical console or the serial line over a websocket,
   from a browser or from a test harness.
+- Power operations through systemd (section 12).
+- Machine lifecycle, cluster join, telemetry and scenarios, as
+  [`cluster.md`](cluster.md) names them. Those slices land under
+  https://github.com/maglo/qemu-lab-manager/issues/72.
 
-Out, for now:
+Out:
 
-- Creating, destroying or reconfiguring machines. That stays in Ansible.
-- Power operations. Deliberately deferred — see §8.
+- Ansible as the deployer of this lab or of its VMs. See
+  [`cluster.md`](cluster.md).
 - Anything resembling a user database.
 
 ---
@@ -311,7 +318,7 @@ scrollable page:
 - Disk images: path, format, virtual and actual size, backing file.
 - Network: taps, bridges, MAC addresses, guest addresses if known.
 - Memory, vCPUs, machine type, firmware.
-- The machine's entry in the Ansible inventory, verbatim.
+- The machine's inventory entry, verbatim.
 
 There is no logs tab. labview concerns itself with the VMs. A host's journal
 is host business, even when it is scoped to one unit. The serial transcript
@@ -528,28 +535,28 @@ and nothing to escape.
 The graphical console stays pure binary. Its protocol has its own handshake
 and nothing may be injected into it.
 
-### The deployment is a systemd unit
+### The process is a systemd unit on a bootc node
 
-labview runs on the hypervisor as a systemd unit. There is no container
-image.
+labview runs as a systemd unit. On a lab node the host OS is a bootc
+image; see [`cluster.md`](cluster.md) section 3. On a laptop the same
+binary still runs under a unit or a foreground process against a fake
+lab.
 
-Host access is local. labview reads the QEMU socket directory, the process
-list and the system bus, and it asks systemd to start and stop units. The
-targeted SELinux policy of Enterprise Linux denies `container_t` each one,
-and no boolean opens them. A container reaches them through `spc_t` and the
-process namespace of the host, and `spc_t` carries
-`unconfined_domain_type`. That is a wider boundary than a unit, not a
-narrower one.
+Host access is local to the node. labview reads the QEMU socket
+directory, the process list and the system bus, and it asks systemd to
+start and stop units. A container process on a foreign host OS cannot
+do that under `container_t`, and `spc_t` is unconfined. That rejection
+stands. bootc avoids it because the image is the host.
 
-The unit gives the boundary instead. `ProtectSystem=strict`, `PrivateTmp`,
-`NoNewPrivileges`, a `CapabilityBoundingSet` and a scoped `ReadWritePaths`
-bound what labview reaches. The polkit rule of section 12 bounds the units
-it manages, and polkit matches the user name that the host sees.
+The unit gives the boundary. `ProtectSystem=strict`, `PrivateTmp`,
+`NoNewPrivileges`, a `CapabilityBoundingSet` and a scoped
+`ReadWritePaths` bound what labview reaches. The polkit rule of
+section 12 bounds the units it manages.
 
-Packaging is the other half of the reason. The binary is static and the
-browser application is embedded, so an image carries one file and isolates
-no dependency. A release attaches that binary for Linux and macOS on both
-architectures.
+`deploy/` still holds the unit, the polkit rule and the nginx file for
+the node. The bootc image installs them. A GitHub release still
+attaches the binary for Linux and macOS so a developer can build the
+UI without a node.
 
 ---
 
@@ -650,33 +657,31 @@ socket, so a harness reads it.
 
 ## 13. Boundaries
 
-labview is a standalone service. It does not assume Ansible, and nothing in
-it should. Whether the collection deploys it and writes its inventory is a
-deployment question to answer later, and the design stays usable either way.
+labview is the control plane of a lab node. It does not assume Ansible.
+Machine create and destroy go through the API; see
+[`cluster.md`](cluster.md).
 
 Three interfaces, and they are the whole contract:
 
-**Inventory in.** A directory of YAML files in the shape of §6, one for each
-machine. labview watches the directory and follows what it finds. Any
-producer will do — a playbook, a script, a person with an editor.
+**Machine truth in.** Today a directory of YAML files in the shape of
+§6. The LCM slices replace that directory with API-created machines.
+Until those slices land, the directory remains the local source.
 
-**Host access out.** An internal interface, because the channels split two
-ways. Framebuffer and serial are dialable over the network. The QEMU command
-line, the unit state and power operations are not — they are local to the
-hypervisor.
+**Host access out.** An internal interface, because the channels split
+two ways. Framebuffer and serial are dialable over the network. The
+QEMU command line, the unit state and power operations are not — they
+are local to the node.
 
-**API out.** HTTP and websockets as in §5, with everything the UI displays
-also available as JSON. The UI is one consumer, a test harness is another,
-and neither gets a privileged path.
+**API out.** HTTP and websockets as in §5, with everything the UI
+displays also available as JSON. The UI is one consumer, a scenario
+runner is another, and neither gets a privileged path.
 
-### What that means for multiple hypervisors
+### What that means for multiple nodes
 
-One labview per hypervisor, with the local implementation of host access.
-This is the v1 shape, and it is why §6's inventory can list a `host` field
-without labview needing to reach it.
+One labview per node, with local host access for the machines it owns.
+A cluster control plane reaches other nodes over the same §5 API on a
+private network. [`cluster.md`](cluster.md) section 5 names join,
+scheduling and auto-extend.
 
-Aggregation, if it is wanted later, is a labview configured with remote
-hosts that are other labviews. The remote implementation of host access
-speaks the API from §5, which already exists and is already authenticated at
-the proxy. No agent, no second protocol, and a single-host install is not
-paying for a feature it does not use.
+A single node with no peers is a valid lab. It does not pay for
+cluster features it does not use.
