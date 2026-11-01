@@ -672,11 +672,27 @@ and neither gets a privileged path.
 ### What that means for multiple hypervisors
 
 One labview per hypervisor, with the local implementation of host access.
-This is the v1 shape, and it is why §6's inventory can list a `host` field
-without labview needing to reach it.
+That is the common shape, and it is why §6's inventory can list a `host`
+field without labview needing to reach it.
 
-Aggregation, if it is wanted later, is a labview configured with remote
-hosts that are other labviews. The remote implementation of host access
-speaks the API from §5, which already exists and is already authenticated at
-the proxy. No agent, no second protocol, and a single-host install is not
-paying for a feature it does not use.
+A second labview can aggregate. It takes `-peer name=url` once per remote
+labview. It speaks the API from §5 to each peer. No agent. No second
+protocol. A labview with no peers is unchanged, so a single-host install
+does not pay for aggregation.
+
+The aggregator keeps its own inventory for machines on its own host. Peer
+machines join the same wall list. A peer machine id is `peer:local-id`,
+because a path segment cannot hold a slash and the browser already encodes
+the id. Two peers may run a machine with the same local id.
+
+Console and serial addresses stay on the peer. Many of them are unix paths
+on the peer host, and §6 already withholds addresses from clients. So the
+aggregator proxies every machine-scoped HTTP path to the peer, and it
+forwards the identity header the proxy asserted. Leases, serial brokers,
+QMP and recordings stay on the peer that owns the sockets.
+
+Websocket forwarding is a later slice of the same design. Until it lands,
+a console or serial attach to a remote machine answers 501.
+
+A peer that does not answer is named in `peerFailures` on
+`GET /api/machines`. The rest of the wall still loads.

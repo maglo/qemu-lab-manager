@@ -21,6 +21,9 @@ import (
 // can open a machine that is switched off, wait there, start it, and watch it
 // come up from the first line (design section 11).
 func (s *Server) handleSerialWS(w http.ResponseWriter, r *http.Request) {
+	if s.rejectRemoteWS(w, r) {
+		return
+	}
 	m, ok := s.machine(w, r)
 	if !ok {
 		return

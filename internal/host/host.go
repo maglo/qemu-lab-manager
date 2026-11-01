@@ -6,8 +6,9 @@
 // section 13, "Host access out").
 //
 // Everything here is readable without libvirt and without an agent, which is
-// the point. The interface is also the seam that a future aggregating labview
-// would implement by speaking the section 5 API to another labview.
+// the point. Aggregation across hypervisors does not add a remote Access:
+// an aggregating labview proxies the section 5 API to peer labviews instead
+// (design section 13).
 package host
 
 import (

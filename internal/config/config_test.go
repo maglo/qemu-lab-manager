@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/maglo/qemu-lab-manager/labview/internal/peer"
 )
 
 func TestDefaultIsValid(t *testing.T) {
@@ -38,6 +40,8 @@ func TestBindParsesFlags(t *testing.T) {
 		"-recordings-dir", "/tmp/casts",
 		"-screenshot-dir", "/tmp/shots",
 		"-screenshot-interval", "2s",
+		"-peer", "kvm01=https://kvm01.example/labview",
+		"-peer", "kvm02=https://kvm02.example/labview",
 	})
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
@@ -61,12 +65,16 @@ func TestBindParsesFlags(t *testing.T) {
 	if c.CaptureDir != "/tmp/shots" || c.CaptureInterval != 2*time.Second {
 		t.Errorf("capture settings = %q every %s", c.CaptureDir, c.CaptureInterval)
 	}
+	if len(c.Peers) != 2 || c.Peers[0].Name != "kvm01" || c.Peers[1].Name != "kvm02" {
+		t.Errorf("Peers = %+v", c.Peers)
+	}
 }
 
 func TestBindRejectsUnknownEnums(t *testing.T) {
 	for _, args := range [][]string{
 		{"-tile-mode", "hologram"},
 		{"-host-access", "libvirt"},
+		{"-peer", "bad"},
 	} {
 		c := Default()
 		fs := flag.NewFlagSet("labview", flag.ContinueOnError)
@@ -75,6 +83,19 @@ func TestBindRejectsUnknownEnums(t *testing.T) {
 		if err := fs.Parse(args); err == nil {
 			t.Errorf("%v was accepted", args)
 		}
+	}
+}
+
+func TestValidateRejectsDuplicatePeers(t *testing.T) {
+	c := Default()
+	c.TranscriptDir = ""
+	c.TranscriptMaxFiles = 0
+	c.Peers = []peer.Peer{
+		{Name: "kvm01", URL: "http://a"},
+		{Name: "kvm01", URL: "http://b"},
+	}
+	if err := c.Validate(); err == nil {
+		t.Fatal("duplicate peer names were accepted")
 	}
 }
 

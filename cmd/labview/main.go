@@ -23,6 +23,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/host"
 	"github.com/maglo/qemu-lab-manager/labview/internal/inventory"
 	"github.com/maglo/qemu-lab-manager/labview/internal/lease"
+	"github.com/maglo/qemu-lab-manager/labview/internal/peer"
 	"github.com/maglo/qemu-lab-manager/labview/internal/qmp"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
 	"github.com/maglo/qemu-lab-manager/labview/internal/web"
@@ -113,6 +114,14 @@ func run(args []string) error {
 		Timeout:    cfg.ControlTimeout,
 	})
 
+	peers, err := peer.New(peer.Options{
+		Peers:          cfg.Peers,
+		IdentityHeader: cfg.IdentityHeader,
+	})
+	if err != nil {
+		return fmt.Errorf("peers: %w", err)
+	}
+
 	ui, err := web.Handler()
 	if err != nil {
 		return fmt.Errorf("ui: %w", err)
@@ -125,6 +134,7 @@ func run(args []string) error {
 		Leases:    leases,
 		Hosts:     hosts,
 		Control:   control,
+		Peers:     peers,
 		Activity:  activity.New(cfg.ActivityCapacity, log),
 		Log:       log,
 		UI:        ui,
@@ -158,6 +168,7 @@ func run(args []string) error {
 		"address", ln.Addr().String(),
 		"version", version,
 		"machines", watcher.Current().Len(),
+		"peers", peers.Len(),
 		"host_access", string(cfg.HostAccess),
 		"tile_mode", string(cfg.TileMode),
 		"recordings", cfg.TranscriptDir,

@@ -1,0 +1,14 @@
+---
+major_changes:
+  - "labview - an aggregating labview joins peer labviews on one wall.
+    ``-peer name=url`` names each peer. Peer machines appear as
+    ``peer:local-id`` on ``GET /api/machines``, and machine-scoped HTTP
+    requests forward to the peer that owns them
+    (https://github.com/maglo/qemu-lab-manager/issues/70)."
+known_issues:
+  - "labview - websocket forwarding to a peer is not available yet. A
+    console or serial attach to a remote machine answers 501
+    (https://github.com/maglo/qemu-lab-manager/issues/70)."
+trivial:
+  - "docs - section 13 records how aggregation works
+    (https://github.com/maglo/qemu-lab-manager/issues/70)."

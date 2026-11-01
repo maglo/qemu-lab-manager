@@ -12,6 +12,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/host"
 	"github.com/maglo/qemu-lab-manager/labview/internal/inventory"
 	"github.com/maglo/qemu-lab-manager/labview/internal/lease"
+	"github.com/maglo/qemu-lab-manager/labview/internal/peer"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
 )
 
@@ -123,6 +124,9 @@ func unitWhy(u host.Unit) string {
 }
 
 // handleMachines serves the inventory plus liveness and lease holders.
+//
+// Peer machines join the same list under composite ids (design section 13).
+// A peer that fails is named in the response and does not hide the rest.
 func (s *Server) handleMachines(w http.ResponseWriter, r *http.Request) {
 	states := s.brokers.States()
 	leases := s.leases.All()
@@ -133,11 +137,28 @@ func (s *Server) handleMachines(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	set := s.inventory.Current()
-	out := make([]machineSummary, 0, set.Len())
+	out := make([]any, 0, set.Len())
 	for _, m := range set.Machines() {
 		out = append(out, s.summarise(ctx, m, states, leases))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"machines": out})
+
+	var peerFailed []peer.Failure
+	if s.peers != nil && s.peers.Len() > 0 {
+		remote, failed := s.peers.ListMachines(ctx, s.identity(r))
+		peerFailed = failed
+		for _, m := range remote {
+			out = append(out, m)
+		}
+		for _, f := range failed {
+			s.log.Warn("peer machines listing failed", "peer", f.Peer, "error", f.Error)
+		}
+	}
+
+	body := map[string]any{"machines": out}
+	if len(peerFailed) > 0 {
+		body["peerFailures"] = peerFailed
+	}
+	writeJSON(w, http.StatusOK, body)
 }
 
 // machineRecord is the whole record for one machine: everything the details
@@ -322,9 +343,13 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	// A machine file that does not load leaves the other machines running,
 	// so the only sign of it is the log. Say so here as well, where a
 	// monitor can see it.
-	writeJSON(w, http.StatusOK, map[string]any{
+	body := map[string]any{
 		"ok":       true,
 		"machines": s.inventory.Current().Len(),
 		"failed":   s.inventory.Failed(),
-	})
+	}
+	if s.peers != nil && s.peers.Len() > 0 {
+		body["peers"] = s.peers.Len()
+	}
+	writeJSON(w, http.StatusOK, body)
 }

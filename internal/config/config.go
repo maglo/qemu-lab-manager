@@ -11,6 +11,8 @@ import (
 	"flag"
 	"fmt"
 	"time"
+
+	"github.com/maglo/qemu-lab-manager/labview/internal/peer"
 )
 
 // TileMode selects how the wall renders a tile.
@@ -79,6 +81,10 @@ type Config struct {
 
 	TileMode   TileMode
 	HostAccess HostAccessMode
+
+	// Peers are other labviews whose machines join this wall (design
+	// section 13). Empty keeps the single-host shape.
+	Peers []peer.Peer
 
 	// CaptureDir is where QEMU writes a screenshot and labview reads it
 	// again. QEMU writes the file as its own user, so the directory is
@@ -195,6 +201,14 @@ func Bind(fs *flag.FlagSet, c *Config) {
 		}
 		return fmt.Errorf("must be %q, %q or %q", HostLocal, HostNone, HostFake)
 	})
+	fs.Func("peer", "another labview to show on this wall, as name=url; repeatable", func(v string) error {
+		p, err := peer.ParseFlag(v)
+		if err != nil {
+			return err
+		}
+		c.Peers = append(c.Peers, p)
+		return nil
+	})
 
 	fs.BoolVar(&c.Verbose, "verbose", c.Verbose, "log at debug level")
 }
@@ -234,6 +248,13 @@ func (c Config) Validate() error {
 		// Not an error, just pointless; say so rather than silently
 		// ignoring retention settings.
 		errs = append(errs, errors.New("retention is configured but recordings-dir is empty, so nothing is captured"))
+	}
+	seenPeer := make(map[string]struct{}, len(c.Peers))
+	for _, p := range c.Peers {
+		if _, ok := seenPeer[p.Name]; ok {
+			errs = append(errs, fmt.Errorf("peer name %q is repeated", p.Name))
+		}
+		seenPeer[p.Name] = struct{}{}
 	}
 	return errors.Join(errs...)
 }
