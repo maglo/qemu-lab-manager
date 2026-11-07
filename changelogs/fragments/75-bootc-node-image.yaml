@@ -1,0 +1,10 @@
+---
+major_changes:
+  - "image - ship a Fedora bootc lab node as
+    ``ghcr.io/maglo/qemu-lab-manager/labview-node``. The image holds
+    QEMU, labview and the unit that starts it. A push to ``main``
+    publishes ``:latest``
+    (https://github.com/maglo/qemu-lab-manager/issues/75)."
+minor_changes:
+  - "docs - lock the cluster registry to GHCR and the base to Fedora
+    bootc (https://github.com/maglo/qemu-lab-manager/issues/75)."

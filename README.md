@@ -57,6 +57,7 @@ Each release attaches a binary for Linux and macOS on both architectures.
 | Document | What it covers |
 |---|---|
 | [`docs/design/cluster.md`](docs/design/cluster.md) | The lab cluster product: bootc image, machine LCM, cluster join, telemetry and scenarios. |
+| [`image/README.md`](image/README.md) | Build and boot the Fedora bootc lab node image. |
 | [`docs/design/labview.md`](docs/design/labview.md) | The console wall: inventory format, HTTP and websocket surface, serial broker, write lease, power, local host access. |
 | [`docs/design/changelog.md`](docs/design/changelog.md) | How a change reaches the changelog, and how a release is cut. |
 | [`docs/design/checks.md`](docs/design/checks.md) | Every workflow and every job, and the commands to run before a push. |

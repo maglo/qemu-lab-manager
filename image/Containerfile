@@ -1,0 +1,48 @@
+# labview-node -- a Fedora bootc image for one lab hypervisor.
+#
+# The image is the host OS (docs/design/cluster.md section 3). labview
+# runs as a systemd unit on it, not as a container process on a foreign
+# OS. Build and publish:
+#
+#   podman build -t ghcr.io/maglo/qemu-lab-manager/labview-node:latest \
+#     -f image/Containerfile .
+#
+# A pull request builds this image. A push to main or a version tag
+# publishes it to GHCR.
+
+# -----------------------------------------------------------------------------
+# Build the static labview binary.
+# -----------------------------------------------------------------------------
+FROM docker.io/library/golang:1.24.7 AS build
+
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+ARG VERSION=dev
+RUN CGO_ENABLED=0 go build -trimpath \
+	-ldflags "-s -w -X main.version=${VERSION}" \
+	-o /out/labview ./cmd/labview
+
+# -----------------------------------------------------------------------------
+# Assemble the bootable node.
+# -----------------------------------------------------------------------------
+FROM quay.io/fedora/fedora-bootc:45
+
+# QEMU is the hypervisor. No libvirt: labview talks to sockets, files and
+# the system bus (docs/design/labview.md).
+RUN dnf -y install \
+	qemu-kvm \
+	qemu-system-x86 \
+	qemu-img \
+	edk2-ovmf \
+	polkit \
+	&& dnf clean all
+
+COPY --from=build /out/labview /usr/bin/labview
+COPY image/root/ /
+
+# sysusers and tmpfiles create the labview account and state dirs on first
+# boot. Enable the unit in the image so a fresh node serves the wall.
+RUN systemctl enable labview.service \
+	&& bootc container lint

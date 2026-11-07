@@ -1,0 +1,98 @@
+name: image
+
+# Build the Fedora bootc lab node. Publish to GHCR on main and on a
+# version tag. A pull request builds and does not push
+# (docs/design/cluster.md section 3).
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build labview-node
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: image name and tags
+        id: meta
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          image="ghcr.io/${REPOSITORY}/labview-node"
+          short="sha-${SHA:0:12}"
+          echo "image=$image" >>"$GITHUB_OUTPUT"
+          if [ "$REF_TYPE" = "tag" ]; then
+            version="${REF_NAME#v}"
+            tags="$image:$short,$image:$version,$image:latest"
+          elif [ "$EVENT_NAME" = "push" ]; then
+            version="$short"
+            tags="$image:$short,$image:latest"
+          else
+            version=dev
+            tags="$image:$short"
+          fi
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+          echo "tags=$tags" >>"$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "push=false" >>"$GITHUB_OUTPUT"
+          else
+            echo "push=true" >>"$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        if: steps.meta.outputs.push == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: image/Containerfile
+          push: ${{ steps.meta.outputs.push == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+          # bootc bases are large; keep one layer cache per branch.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+  gate:
+    name: image passed
+    needs: [build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: check the results
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "error: a job of this workflow did not pass"
+              exit 1
+            fi
+          done

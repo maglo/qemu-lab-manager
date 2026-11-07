@@ -67,7 +67,21 @@ quicker to read from an image than from an assertion message.
 [`test/lab/README.md`](../../test/lab/README.md) says why the browser layer
 exists and how to add a check.
 
-## 5. `release.yml`
+## 5. `image.yml`
+
+The Fedora bootc lab node. It runs on a pull request, on a push to
+`main` and on a `v*` tag.
+
+| Job | What it does |
+|---|---|
+| `build labview-node` | Build `image/Containerfile`. Push to GHCR on `main` and on a tag. |
+
+A pull request builds the image and does not push. The image name is
+`ghcr.io/maglo/qemu-lab-manager/labview-node`.
+[`cluster.md`](cluster.md) section 3 gives the reasons.
+[`image/README.md`](../../image/README.md) says how to build a disk.
+
+## 6. `release.yml`
 
 A `v*` tag.
 
@@ -83,16 +97,17 @@ The binaries are what a release ships. `ci.yml` runs on the tag as well, so
 the commit that the tag names passes the same checks as a pull request.
 [`changelog.md`](changelog.md) gives the release process.
 
-## 6. The gate
+## 7. The gate
 
-Each workflow ends with one gate job: `checks passed`, `ci passed` and
-`release passed`. A gate depends on every other job of its workflow, and it
-fails if one of them does not pass. A skipped job and a cancelled job also
-fail the gate.
+Each workflow ends with one gate job: `checks passed`, `ci passed`,
+`image passed` and `release passed`. A gate depends on every other job
+of its workflow, and it fails if one of them does not pass. A skipped
+job and a cancelled job also fail the gate.
 
-The ruleset of `main` names `checks passed` and `ci passed`. It names no
-other job, and it does not name `release passed`, because a tag is not a
-pull request.
+The ruleset of `main` names `checks passed` and `ci passed`. It names
+no other job, and it does not name `release passed` or `image passed`,
+because a tag is not a pull request and the image build is not a merge
+gate yet.
 
 A new job therefore needs no change in the ruleset. Add the new job to the
 `needs` list of the gate of its workflow. `workflows` fails if you forget.

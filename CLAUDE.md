@@ -20,6 +20,7 @@ shape.
 | `changelogs/` | The fragments and the released entries. | [`changelog.md`](docs/design/changelog.md) |
 | `test/lab` | The fake lab and the browser checks. | [`test/lab/README.md`](test/lab/README.md) |
 | `deploy/` | The systemd unit, the polkit rule and the nginx file. | [`labview.md`](docs/design/labview.md), [`cluster.md`](docs/design/cluster.md) |
+| `image/` | The Fedora bootc lab node image. | [`cluster.md`](docs/design/cluster.md), [`image/README.md`](image/README.md) |
 | `scripts/` | The check scripts. | [`checks.md`](docs/design/checks.md) |
 | `.github/workflows/` | The workflows. | [`checks.md`](docs/design/checks.md) |
 
