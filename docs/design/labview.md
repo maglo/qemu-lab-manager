@@ -682,9 +682,9 @@ runner is another, and neither gets a privileged path.
 ### What that means for multiple nodes
 
 One labview per node, with local host access for the machines it owns.
-A cluster control plane reaches other nodes over the same §5 API on a
-private network. [`cluster.md`](cluster.md) section 5 names join,
-scheduling and auto-extend.
+`-peer name=url` joins other nodes over the same §5 API.
+[`cluster.md`](cluster.md) section 5 names the wire form, scheduling
+and auto-extend.
 
 A single node with no peers is a valid lab. It does not pay for
 cluster features it does not use.

@@ -22,6 +22,7 @@ shape.
 | `deploy/` | The systemd unit, the polkit rule and the nginx file. | [`labview.md`](docs/design/labview.md), [`cluster.md`](docs/design/cluster.md) |
 | `image/` | The Fedora bootc lab node image. | [`cluster.md`](docs/design/cluster.md), [`image/README.md`](image/README.md) |
 | `internal/lifecycle` | Create and destroy machines. | [`cluster.md`](docs/design/cluster.md) |
+| `internal/peer` | Talk to other labview nodes. | [`cluster.md`](docs/design/cluster.md) |
 | `scripts/` | The check scripts. | [`checks.md`](docs/design/checks.md) |
 | `.github/workflows/` | The workflows. | [`checks.md`](docs/design/checks.md) |
 

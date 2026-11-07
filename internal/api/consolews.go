@@ -29,6 +29,9 @@ import (
 // keyboard elsewhere -- enforced here rather than only by flipping noVNC's
 // viewOnly, so a second tab or a scripted client cannot type either.
 func (s *Server) handleConsoleWS(w http.ResponseWriter, r *http.Request) {
+	if s.rejectRemoteWS(w, r) {
+		return
+	}
 	m, ok := s.machine(w, r)
 	if !ok {
 		return

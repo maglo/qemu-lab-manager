@@ -11,6 +11,8 @@ import (
 	"flag"
 	"fmt"
 	"time"
+
+	"github.com/maglo/qemu-lab-manager/labview/internal/peer"
 )
 
 // TileMode selects how the wall renders a tile.
@@ -56,6 +58,13 @@ type Config struct {
 	// machines (docs/design/cluster.md section 4). Empty disables create
 	// and destroy.
 	MachinesDir string
+
+	// Peers are other labview nodes whose machines join this wall
+	// (docs/design/cluster.md section 5). Empty keeps a single-node lab.
+	Peers []peer.Peer
+	// ClusterToken is sent to peers as X-Labview-Cluster-Token. Empty
+	// sends nothing.
+	ClusterToken string
 
 	// IdentityHeader carries the identity the proxy asserted. It names the
 	// lease holder in the UI and says who attached to what in the log. It
@@ -155,6 +164,16 @@ func Bind(fs *flag.FlagSet, c *Config) {
 		"how often to read the inventory directory again, as a backstop to the watch")
 	fs.StringVar(&c.MachinesDir, "machines-dir", c.MachinesDir,
 		"directory for API-created machine disks; empty disables create and destroy")
+	fs.Func("peer", "another labview node to show on this wall, as name=url; repeatable", func(v string) error {
+		p, err := peer.ParseFlag(v)
+		if err != nil {
+			return err
+		}
+		c.Peers = append(c.Peers, p)
+		return nil
+	})
+	fs.StringVar(&c.ClusterToken, "cluster-token", c.ClusterToken,
+		"token sent to peer labviews; empty sends none")
 
 	fs.StringVar(&c.IdentityHeader, "identity-header", c.IdentityHeader,
 		"request header carrying the identity asserted by the proxy")
@@ -244,6 +263,13 @@ func (c Config) Validate() error {
 		// Not an error, just pointless; say so rather than silently
 		// ignoring retention settings.
 		errs = append(errs, errors.New("retention is configured but recordings-dir is empty, so nothing is captured"))
+	}
+	seenPeer := make(map[string]struct{}, len(c.Peers))
+	for _, p := range c.Peers {
+		if _, ok := seenPeer[p.Name]; ok {
+			errs = append(errs, fmt.Errorf("peer name %q is repeated", p.Name))
+		}
+		seenPeer[p.Name] = struct{}{}
 	}
 	return errors.Join(errs...)
 }

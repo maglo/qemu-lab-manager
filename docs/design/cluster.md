@@ -149,10 +149,24 @@ One node runs alone and is a valid lab. Several nodes join one cluster.
 - One node serves the wall and the API that clients use. Other nodes
   are peers it reaches over the same section-5 API, on a private
   network the image configures.
-- A machine id is unique in the cluster. The control plane assigns it.
 - Auto-extend adds a node when the scheduler cannot place a machine.
   How a node is provisioned (cloud API, bare metal, nested VM) is an
   open decision on issue #72.
+
+### Join (this slice)
+
+`-peer name=url` names each peer (repeatable). Peer machines appear on
+`GET /api/machines` as `peer:local-id`. Machine-scoped HTTP forwards to
+the peer that owns the machine. Create stays local: a client that wants
+a machine on a peer calls that peer, or a later scheduler does.
+
+`-cluster-token` is sent as `X-Labview-Cluster-Token` on peer calls.
+Empty sends nothing. Enforcing the token on inbound requests is a
+later hardening slice.
+
+Websocket attach to a remote machine answers 501 until forwarding
+lands. A peer that does not answer is named in `peerFailures` on the
+machines list; the rest of the wall still loads.
 
 Failure rule: a node that disappears keeps its machines marked
 unreachable. The control plane does not silently recreate them on
@@ -213,8 +227,8 @@ Work lands in this order. Each slice has its own issue under #72.
 
 1. This document and the scope fix in `labview.md`.
 2. Fedora bootc image on GHCR; one node; wall for local machines.
-3. Machine create and destroy on one node (this slice).
-4. Cluster join; one pane across nodes.
+3. Machine create and destroy on one node.
+4. Cluster join; one pane across nodes (this slice).
 5. Telemetry stream.
 6. Scenario object and runner.
 7. Auto-extend of capacity.

@@ -1,0 +1,14 @@
+---
+major_changes:
+  - "labview - ``-peer name=url`` joins other labview nodes on one wall.
+    Peer machines appear as ``peer:local-id``. Machine-scoped HTTP
+    forwards to the peer that owns them
+    (https://github.com/maglo/qemu-lab-manager/issues/79)."
+minor_changes:
+  - "labview - ``-cluster-token`` is sent to peers as
+    ``X-Labview-Cluster-Token``
+    (https://github.com/maglo/qemu-lab-manager/issues/79)."
+known_issues:
+  - "labview - websocket forwarding to a peer is not available yet. A
+    console or serial attach to a remote machine answers 501
+    (https://github.com/maglo/qemu-lab-manager/issues/79)."

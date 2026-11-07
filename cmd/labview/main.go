@@ -24,6 +24,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/inventory"
 	"github.com/maglo/qemu-lab-manager/labview/internal/lease"
 	"github.com/maglo/qemu-lab-manager/labview/internal/lifecycle"
+	"github.com/maglo/qemu-lab-manager/labview/internal/peer"
 	"github.com/maglo/qemu-lab-manager/labview/internal/qmp"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
 	"github.com/maglo/qemu-lab-manager/labview/internal/web"
@@ -138,6 +139,15 @@ func run(args []string) error {
 		})
 	}
 
+	peers, err := peer.New(peer.Options{
+		Peers:          cfg.Peers,
+		IdentityHeader: cfg.IdentityHeader,
+		ClusterToken:   cfg.ClusterToken,
+	})
+	if err != nil {
+		return fmt.Errorf("peers: %w", err)
+	}
+
 	ui, err := web.Handler()
 	if err != nil {
 		return fmt.Errorf("ui: %w", err)
@@ -151,6 +161,7 @@ func run(args []string) error {
 		Hosts:     hosts,
 		Control:   control,
 		Life:      life,
+		Peers:     peers,
 		Activity:  activity.New(cfg.ActivityCapacity, log),
 		Log:       log,
 		UI:        ui,
@@ -185,6 +196,7 @@ func run(args []string) error {
 		"version", version,
 		"machines", watcher.Current().Len(),
 		"lifecycle", life != nil && life.Enabled(),
+		"peers", peers.Len(),
 		"host_access", string(cfg.HostAccess),
 		"tile_mode", string(cfg.TileMode),
 		"recordings", cfg.TranscriptDir,
