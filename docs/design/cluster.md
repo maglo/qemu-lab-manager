@@ -20,7 +20,7 @@ In:
 
 - Machine lifecycle over the API: create, configure, start, stop,
   destroy.
-- A bootc image on Quay.io. The image is the node OS.
+- A Fedora bootc image on GHCR. The image is the node OS.
 - A cluster of nodes, one wall, one API.
 - Nodes that join and leave. Capacity that extends when the lab needs
   more hosts.
@@ -115,8 +115,29 @@ exists. Create of a new id is free; the creator holds the first lease.
 The console, serial, screenshot and key endpoints stay as
 [`labview.md`](labview.md) section 5 names them.
 
-Exact create document fields land with the LCM implementation slice.
-They name image, memory, CPUs, networks and cloud-init or equivalent.
+### Create document
+
+```json
+{
+  "id": "el9-build",
+  "name": "el9-build",
+  "memoryMb": 2048,
+  "vcpus": 2,
+  "diskGb": 20,
+  "notes": "",
+  "image": ""
+}
+```
+
+`image` empty means a blank raw disk under
+`/var/lib/labview/machines/{id}/`. A backing image path is a later
+slice. Create writes the inventory entry, a `qemu.argv` file and a
+sparse disk, and names the unit `qemu-vm@{id}.service`. The node image
+ships that template unit. Destroy requires the write lease, stops the
+unit, and removes the files.
+
+`-machines-dir` empty disables create and destroy. The default is
+`/var/lib/labview/machines`.
 
 ---
 
@@ -192,7 +213,7 @@ Work lands in this order. Each slice has its own issue under #72.
 
 1. This document and the scope fix in `labview.md`.
 2. Fedora bootc image on GHCR; one node; wall for local machines.
-3. Machine create and destroy on one node.
+3. Machine create and destroy on one node (this slice).
 4. Cluster join; one pane across nodes.
 5. Telemetry stream.
 6. Scenario object and runner.

@@ -19,6 +19,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/host"
 	"github.com/maglo/qemu-lab-manager/labview/internal/inventory"
 	"github.com/maglo/qemu-lab-manager/labview/internal/lease"
+	"github.com/maglo/qemu-lab-manager/labview/internal/lifecycle"
 	"github.com/maglo/qemu-lab-manager/labview/internal/qmp"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
 )
@@ -31,6 +32,7 @@ type Server struct {
 	leases    *lease.Manager
 	hosts     host.Access
 	control   *qmp.Manager
+	life      *lifecycle.Manager
 	activity  *activity.Log
 	log       *slog.Logger
 
@@ -48,6 +50,8 @@ type Deps struct {
 	// Control runs QMP commands on the machines that have a control
 	// socket. Nil builds one from the configuration.
 	Control *qmp.Manager
+	// Life creates and destroys machines. Nil disables those endpoints.
+	Life *lifecycle.Manager
 
 	Activity *activity.Log
 	Log      *slog.Logger
@@ -77,6 +81,7 @@ func New(d Deps) *Server {
 		leases:    d.Leases,
 		hosts:     d.Hosts,
 		control:   control,
+		life:      d.Life,
 		activity:  d.Activity,
 		log:       log,
 		mux:       http.NewServeMux(),
@@ -89,7 +94,9 @@ func New(d Deps) *Server {
 func (s *Server) routes() {
 	// The section 5 surface.
 	s.mux.HandleFunc("GET /api/machines", s.handleMachines)
+	s.mux.HandleFunc("POST /api/machines", s.handleCreateMachine)
 	s.mux.HandleFunc("GET /api/machines/{id}", s.handleMachine)
+	s.mux.HandleFunc("DELETE /api/machines/{id}", s.handleDestroyMachine)
 	s.mux.HandleFunc("POST /api/machines/{id}/lease", s.handleLease)
 	s.mux.HandleFunc("GET /ws/console/{id}", s.handleConsoleWS)
 	s.mux.HandleFunc("GET /ws/serial/{id}", s.handleSerialWS)
@@ -128,7 +135,7 @@ func (s *Server) routes() {
 func (s *Server) handleNoEndpoint(w http.ResponseWriter, r *http.Request) {
 	// The mux answers 405 only while nothing else matches, and this matches
 	// everything under the prefix, so the method check lands here now.
-	for _, method := range []string{http.MethodGet, http.MethodPost} {
+	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodDelete} {
 		if method == r.Method {
 			continue
 		}

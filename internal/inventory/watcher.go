@@ -44,6 +44,7 @@ type Watcher struct {
 	watching bool
 
 	mu     sync.Mutex
+	scanMu sync.Mutex // serialises reload across Run and Rescan
 	failed []string
 	subs   []chan struct{}
 }
@@ -103,6 +104,12 @@ func (w *Watcher) Failed() []string {
 	out := make([]string, len(w.failed))
 	copy(out, w.failed)
 	return out
+}
+
+// Rescan reads the inventory directory again now. Create and destroy call
+// it so the wall sees the change before the next periodic scan.
+func (w *Watcher) Rescan() {
+	w.reload()
 }
 
 // Subscribe returns a channel notified after each reload that changes
@@ -182,6 +189,9 @@ func (w *Watcher) watch() bool {
 }
 
 func (w *Watcher) reload() {
+	w.scanMu.Lock()
+	defer w.scanMu.Unlock()
+
 	set, changed, errs := w.loader.scan()
 	if set == nil {
 		// The directory itself is gone or unreadable. Keep the live set:

@@ -760,12 +760,13 @@ func TestUnknownEndpointIs404JSON(t *testing.T) {
 func TestKnownEndpointWrongMethodIs405(t *testing.T) {
 	h := newHarness(t)
 
-	rec := h.do("POST", "/api/machines", "alice", nil)
+	rec := h.do("PUT", "/api/machines", "alice", nil)
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want 405: %s", rec.Code, rec.Body)
 	}
-	if allow := rec.Header().Get("Allow"); allow != "GET" {
-		t.Errorf("Allow = %q, want GET", allow)
+	if allow := rec.Header().Get("Allow"); allow != "GET" && allow != "POST" {
+		// Either GET or POST is a valid method on this path.
+		t.Errorf("Allow = %q, want GET or POST", allow)
 	}
 
 	rec = h.do("GET", "/api/machines/el9-build/power", "alice", nil)

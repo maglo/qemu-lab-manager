@@ -52,6 +52,11 @@ type Config struct {
 	InventoryDir    string
 	InventoryRescan time.Duration
 
+	// MachinesDir holds disks and QEMU argv files for API-created
+	// machines (docs/design/cluster.md section 4). Empty disables create
+	// and destroy.
+	MachinesDir string
+
 	// IdentityHeader carries the identity the proxy asserted. It names the
 	// lease holder in the UI and says who attached to what in the log. It
 	// is not an authorisation input -- everyone who gets past the proxy can
@@ -102,8 +107,9 @@ type Config struct {
 func Default() Config {
 	return Config{
 		Listen:          "127.0.0.1:8080",
-		InventoryDir:    "/etc/labview/inventory.d",
+		InventoryDir:    "/var/lib/labview/inventory.d",
 		InventoryRescan: 2 * time.Second,
+		MachinesDir:     "/var/lib/labview/machines",
 		IdentityHeader:  "X-Forwarded-User",
 		DefaultIdentity: "unidentified",
 
@@ -145,6 +151,8 @@ func Bind(fs *flag.FlagSet, c *Config) {
 		"directory holding one YAML file per machine, watched for changes")
 	fs.DurationVar(&c.InventoryRescan, "inventory-rescan", c.InventoryRescan,
 		"how often to read the inventory directory again, as a backstop to the watch")
+	fs.StringVar(&c.MachinesDir, "machines-dir", c.MachinesDir,
+		"directory for API-created machine disks; empty disables create and destroy")
 
 	fs.StringVar(&c.IdentityHeader, "identity-header", c.IdentityHeader,
 		"request header carrying the identity asserted by the proxy")

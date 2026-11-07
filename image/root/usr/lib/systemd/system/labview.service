@@ -13,7 +13,8 @@ Wants=network-online.target
 Type=exec
 ExecStart=/usr/bin/labview \
     -listen 127.0.0.1:8080 \
-    -inventory /etc/labview/inventory.d \
+    -inventory /var/lib/labview/inventory.d \
+    -machines-dir /var/lib/labview/machines \
     -recordings-dir /var/lib/labview/recordings \
     -screenshot-dir /var/lib/labview/screenshots \
     -host-access local

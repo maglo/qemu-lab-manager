@@ -23,6 +23,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/host"
 	"github.com/maglo/qemu-lab-manager/labview/internal/inventory"
 	"github.com/maglo/qemu-lab-manager/labview/internal/lease"
+	"github.com/maglo/qemu-lab-manager/labview/internal/lifecycle"
 	"github.com/maglo/qemu-lab-manager/labview/internal/qmp"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
 	"github.com/maglo/qemu-lab-manager/labview/internal/web"
@@ -73,7 +74,11 @@ func run(args []string) error {
 
 	// The inventory must load before anything else: starting with no
 	// machines because the operator fat-fingered a file would look like a
-	// working but empty lab.
+	// working but empty lab. Create the directory when it is missing so a
+	// fresh node with LCM enabled can start empty.
+	if err := os.MkdirAll(cfg.InventoryDir, 0o755); err != nil {
+		return fmt.Errorf("inventory %s: %w", cfg.InventoryDir, err)
+	}
 	watcher, err := inventory.NewWatcher(cfg.InventoryDir, cfg.InventoryRescan, log)
 	if err != nil {
 		return fmt.Errorf("inventory %s: %w", cfg.InventoryDir, err)
@@ -113,6 +118,22 @@ func run(args []string) error {
 		Timeout:    cfg.ControlTimeout,
 	})
 
+	var life *lifecycle.Manager
+	if cfg.MachinesDir != "" {
+		if err := os.MkdirAll(cfg.MachinesDir, 0o750); err != nil {
+			return fmt.Errorf("machines-dir %s: %w", cfg.MachinesDir, err)
+		}
+		life = lifecycle.New(lifecycle.Options{
+			MachinesDir:  cfg.MachinesDir,
+			InventoryDir: cfg.InventoryDir,
+			Inventory:    watcher,
+			Stop: func(ctx context.Context, m inventory.Machine) error {
+				return hosts.Power(ctx, m, host.OpStop)
+			},
+			Log: log,
+		})
+	}
+
 	ui, err := web.Handler()
 	if err != nil {
 		return fmt.Errorf("ui: %w", err)
@@ -125,6 +146,7 @@ func run(args []string) error {
 		Leases:    leases,
 		Hosts:     hosts,
 		Control:   control,
+		Life:      life,
 		Activity:  activity.New(cfg.ActivityCapacity, log),
 		Log:       log,
 		UI:        ui,
@@ -158,6 +180,7 @@ func run(args []string) error {
 		"address", ln.Addr().String(),
 		"version", version,
 		"machines", watcher.Current().Len(),
+		"lifecycle", life != nil && life.Enabled(),
 		"host_access", string(cfg.HostAccess),
 		"tile_mode", string(cfg.TileMode),
 		"recordings", cfg.TranscriptDir,

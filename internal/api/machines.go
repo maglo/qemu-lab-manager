@@ -315,6 +315,7 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		"hostAccess":        string(s.cfg.HostAccess),
 		"screenshots":       s.control.CaptureEnabled(),
 		"screenshotEveryMs": s.cfg.CaptureInterval.Milliseconds(),
+		"lifecycle":         s.life != nil && s.life.Enabled(),
 	})
 }
 
