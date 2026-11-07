@@ -26,6 +26,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/lifecycle"
 	"github.com/maglo/qemu-lab-manager/labview/internal/peer"
 	"github.com/maglo/qemu-lab-manager/labview/internal/qmp"
+	"github.com/maglo/qemu-lab-manager/labview/internal/scenario"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
 	"github.com/maglo/qemu-lab-manager/labview/internal/telemetry"
 	"github.com/maglo/qemu-lab-manager/labview/internal/web"
@@ -160,6 +161,23 @@ func run(args []string) error {
 	})
 	act := activity.New(cfg.ActivityCapacity, log)
 
+	if cfg.ScenariosDir != "" {
+		if err := os.MkdirAll(cfg.ScenariosDir, 0o750); err != nil {
+			return fmt.Errorf("scenarios-dir %s: %w", cfg.ScenariosDir, err)
+		}
+	}
+	scenarios := scenario.New(scenario.Deps{
+		Inventory: watcher,
+		Brokers:   brokers,
+		Leases:    leases,
+		Hosts:     hosts,
+		Control:   control,
+		Life:      life,
+		Telemetry: telem,
+		Dir:       cfg.ScenariosDir,
+		Log:       log,
+	})
+
 	srv := api.New(api.Deps{
 		Config:    cfg,
 		Inventory: watcher,
@@ -171,6 +189,7 @@ func run(args []string) error {
 		Peers:     peers,
 		Activity:  act,
 		Telemetry: telem,
+		Scenarios: scenarios,
 		Log:       log,
 		UI:        ui,
 	})
