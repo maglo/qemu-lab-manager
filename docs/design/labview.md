@@ -142,7 +142,9 @@ another, and neither gets a privileged path.
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/machines` | Inventory plus liveness and current lease holder |
+| `POST /api/machines` | Create a machine (cluster.md section 4) |
 | `GET /api/machines/{id}` | The whole record: details, disks, network, unit, recordings, activity |
+| `DELETE /api/machines/{id}` | Destroy an API-created machine |
 | `GET /api/machines/{id}/recordings` | Past serial captures |
 | `GET /api/machines/{id}/recordings/{name}` | One capture, asciicast v2 |
 | `GET /api/machines/{id}/activity` | Who attached when, who holds control |
@@ -189,7 +191,7 @@ A directory. One machine is one YAML file in it, and the file name is the
 machine `id`:
 
 ```yaml
-# /etc/labview/inventory.d/el9-build.yaml
+# /var/lib/labview/inventory.d/el9-build.yaml
 name: el9-build
 host: kvm01
 vnc: 10.20.0.11:5901

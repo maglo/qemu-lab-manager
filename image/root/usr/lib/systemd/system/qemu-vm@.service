@@ -1,0 +1,25 @@
+# Instance unit for one API-created lab machine.
+#
+# labview writes /var/lib/labview/machines/%i/qemu.argv and the inventory
+# names this unit as qemu-vm@%i.service (docs/design/cluster.md section 4).
+
+[Unit]
+Description=QEMU lab machine %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=qemu
+Group=qemu
+ExecStart=/usr/bin/qemu-system-x86_64 @/var/lib/labview/machines/%i/qemu.argv
+Restart=on-failure
+RestartSec=2s
+TimeoutStopSec=30s
+KillMode=mixed
+
+# The machine directory holds the disk and the sockets.
+ReadWritePaths=/var/lib/labview/machines/%i
+
+[Install]
+WantedBy=multi-user.target

@@ -13,13 +13,15 @@ import (
 
 // Action types.
 const (
-	ActionAttach   = "attach"
-	ActionDetach   = "detach"
-	ActionGranted  = "control-granted"
-	ActionReleased = "control-released"
-	ActionExpired  = "control-expired"
-	ActionPower    = "power"
-	ActionDenied   = "denied"
+	ActionAttach    = "attach"
+	ActionDetach    = "detach"
+	ActionGranted   = "control-granted"
+	ActionReleased  = "control-released"
+	ActionExpired   = "control-expired"
+	ActionPower     = "power"
+	ActionDenied    = "denied"
+	ActionCreated   = "created"
+	ActionDestroyed = "destroyed"
 )
 
 // Event is one thing that happened to a machine.

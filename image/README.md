@@ -47,8 +47,14 @@ sudo podman run --rm --privileged \
 labview listens on `127.0.0.1:8080` inside the guest. Forward a host
 port or put a proxy in front, as `deploy/nginx-labview.conf` shows.
 
+## Machine create and destroy
+
+`POST /api/machines` creates a machine. `DELETE /api/machines/{id}`
+destroys one the API created. The image ships `qemu-vm@.service`; power
+start runs that unit. See `docs/design/cluster.md` section 4.
+
 ## What this image does not do yet
 
-- Create or destroy VMs over the API (LCM slice).
 - Join a multi-node cluster.
 - Auto-extend capacity.
+- Backing-image create (`image` field).
