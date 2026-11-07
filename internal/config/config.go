@@ -59,6 +59,11 @@ type Config struct {
 	// and destroy.
 	MachinesDir string
 
+	// ScenariosDir holds evidence bundles for scenario runs
+	// (docs/design/scenarios.md). Empty keeps evidence names in memory
+	// only. The runner itself stays on.
+	ScenariosDir string
+
 	// Peers are other labview nodes whose machines join this wall
 	// (docs/design/cluster.md section 5). Empty keeps a single-node lab.
 	Peers []peer.Peer
@@ -164,6 +169,8 @@ func Bind(fs *flag.FlagSet, c *Config) {
 		"how often to read the inventory directory again, as a backstop to the watch")
 	fs.StringVar(&c.MachinesDir, "machines-dir", c.MachinesDir,
 		"directory for API-created machine disks; empty disables create and destroy")
+	fs.StringVar(&c.ScenariosDir, "scenarios-dir", c.ScenariosDir,
+		"directory for scenario evidence bundles; empty keeps evidence only in memory")
 	fs.Func("peer", "another labview node to show on this wall, as name=url; repeatable", func(v string) error {
 		p, err := peer.ParseFlag(v)
 		if err != nil {

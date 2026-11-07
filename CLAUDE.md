@@ -17,6 +17,7 @@ shape.
 | `docs/design/` | One document for each component and each process. | |
 | `docs/design/cluster.md` | The lab cluster product. | [`cluster.md`](docs/design/cluster.md) |
 | `docs/design/scenarios.md` | Scenario documents, runs and evidence. | [`scenarios.md`](docs/design/scenarios.md) |
+| `internal/scenario` | Scenario document parse and runner. | [`scenarios.md`](docs/design/scenarios.md) |
 | `docs/images/` | The pictures that `README.md` shows. | [`test/lab/README.md`](test/lab/README.md) |
 | `changelogs/` | The fragments and the released entries. | [`changelog.md`](docs/design/changelog.md) |
 | `test/lab` | The fake lab and the browser checks. | [`test/lab/README.md`](test/lab/README.md) |

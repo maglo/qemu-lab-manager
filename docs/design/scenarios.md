@@ -9,7 +9,9 @@ document of the scenario interface. Machine create and desired
 hardware stay in [`cluster.md`](cluster.md) section 4. The console
 wall, the lease and interactive serial stay in [`labview.md`](labview.md).
 
-Status: design. Code follows under
+Status: design with a v1 runner under
+https://github.com/maglo/qemu-lab-manager/issues/85.
+The document format was locked under
 https://github.com/maglo/qemu-lab-manager/issues/82.
 
 ---
@@ -173,9 +175,6 @@ already ship. It does not invent a second capture pipeline.
 
 ## 7. HTTP surface
 
-These paths land with the runner implementation. Until then they
-answer 404 like any unknown `/api/` path.
-
 | Method | Path | Meaning |
 |---|---|---|
 | `POST` | `/api/scenarios/runs` | Start a run from a Scenario document. |
@@ -188,8 +187,10 @@ answer 404 like any unknown `/api/` path.
 document (or fails if another holder has one). The runner renews
 leases for the life of the run.
 
-[`labview.md`](labview.md) section 5 stays the table of paths that
-ship today. When the runner ships, that table gains these rows.
+`-scenarios-dir` holds evidence bundles on disk. Empty keeps evidence
+names on the run record only. The runner stays on either way.
+
+These paths are also in [`labview.md`](labview.md) section 5.
 
 ---
 
@@ -253,15 +254,16 @@ poor fit. The document and HTTP surface stay the same.
 
 ---
 
-## 12. Open for the implementation PR
+## 12. Open follow-ons
 
-Locked here: `apiVersion` / `kind`, YAML in-repo and JSON on the wire,
+Locked: `apiVersion` / `kind`, YAML in-repo and JSON on the wire,
 uploaded runs, matching only in the runner, shared version line for
 `Lab` / `Machine` / `Scenario`, evidence bundle shape, HTTP paths,
-telemetry kind names.
+telemetry kind/type names (`scenario` + `run.started` and kin),
+`-scenarios-dir` for bundles.
 
-Still for the first code PR:
+Still open:
 
-1. Exact JSON schema file and validation errors.
+1. Published JSON Schema file beside the docs.
 2. Whether `labviewctl` is a subcommand or a second binary.
-3. Where run bundles live on disk on the node image.
+3. Default `-scenarios-dir` on the node image.

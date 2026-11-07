@@ -2,7 +2,7 @@
 // (docs/design/cluster.md section 6).
 //
 // v1 writes one JSON object per line to an API stream and to stdout.
-// Scenario events wait for the scenario slice. OTLP is a later sink.
+// Scenario events use KindScenario. OTLP is a later sink.
 package telemetry
 
 import (
@@ -15,21 +15,26 @@ import (
 
 // Kinds.
 const (
-	KindNode    = "node"
-	KindMachine = "machine"
+	KindNode     = "node"
+	KindMachine  = "machine"
+	KindScenario = "scenario"
 )
 
 // Types.
 const (
-	TypeUp        = "up"
-	TypeCreated   = "created"
-	TypeDestroyed = "destroyed"
-	TypePower     = "power"
-	TypeLease     = "lease"
-	TypeDenied    = "denied"
-	TypeAttach    = "attach"
-	TypeDetach    = "detach"
-	TypePeerFail  = "peer-fail"
+	TypeUp           = "up"
+	TypeCreated      = "created"
+	TypeDestroyed    = "destroyed"
+	TypePower        = "power"
+	TypeLease        = "lease"
+	TypeDenied       = "denied"
+	TypeAttach       = "attach"
+	TypeDetach       = "detach"
+	TypePeerFail     = "peer-fail"
+	TypeRunStarted   = "run.started"
+	TypeRunFinished  = "run.finished"
+	TypeStepStarted  = "step.started"
+	TypeStepFinished = "step.finished"
 )
 
 // Event is one telemetry record.

@@ -155,6 +155,11 @@ another, and neither gets a privileged path.
 | `GET /api/activity` | The activity of every machine |
 | `GET /api/telemetry` | NDJSON events for the node and its machines (cluster.md section 6) |
 | `GET /api/config` | The settings the browser application needs |
+| `POST /api/scenarios/runs` | Start a scenario run (scenarios.md) |
+| `GET /api/scenarios/runs` | List recent scenario runs |
+| `GET /api/scenarios/runs/{id}` | One scenario run |
+| `POST /api/scenarios/runs/{id}/cancel` | Cancel a scenario run |
+| `GET /api/scenarios/runs/{id}/evidence/{name}` | One evidence file from a run |
 | `GET /ws/console/{id}` | Binary RFB, proxied to the VNC port |
 | `GET /ws/serial/{id}` | Serial stream from the broker, scrollback first |
 | `GET /healthz` | Liveness, and the inventory files that did not load |
@@ -186,9 +191,7 @@ into a small client package rather than into the protocol.
 
 The scenario runner is the one exception that matches, and only on a
 scenario run. It is not part of interactive attach.
-[`scenarios.md`](scenarios.md) names the run paths. Those paths answer
-404 until that slice ships; this table stays the list of paths that
-exist today.
+[`scenarios.md`](scenarios.md) is the document of that runner.
 
 ---
 

@@ -347,6 +347,7 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		"lifecycle":         s.life != nil && s.life.Enabled(),
 		"peers":             s.peers != nil && s.peers.Len() > 0,
 		"telemetry":         s.telemetry != nil,
+		"scenarios":         s.scenarios != nil,
 	})
 }
 

@@ -244,8 +244,8 @@ Work lands in this order. Each slice has its own issue under #72.
 3. Machine create and destroy on one node. Done.
 4. Cluster join; one pane across nodes. Done.
 5. Telemetry stream. Done.
-6. Scenario object and runner
-   (https://github.com/maglo/qemu-lab-manager/issues/82).
+6. Scenario object and runner. Document locked (#82). Runner v1
+   (https://github.com/maglo/qemu-lab-manager/issues/85).
 7. Auto-extend of capacity.
 
 ---

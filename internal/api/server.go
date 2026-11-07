@@ -22,6 +22,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/lifecycle"
 	"github.com/maglo/qemu-lab-manager/labview/internal/peer"
 	"github.com/maglo/qemu-lab-manager/labview/internal/qmp"
+	"github.com/maglo/qemu-lab-manager/labview/internal/scenario"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
 	"github.com/maglo/qemu-lab-manager/labview/internal/telemetry"
 )
@@ -38,6 +39,7 @@ type Server struct {
 	peers     *peer.Client
 	activity  *activity.Log
 	telemetry *telemetry.Bus
+	scenarios *scenario.Runner
 	peerFails *peerFailTracker
 	log       *slog.Logger
 
@@ -64,6 +66,9 @@ type Deps struct {
 	// Telemetry is the cluster event bus (docs/design/cluster.md section 6).
 	// Nil disables GET /api/telemetry.
 	Telemetry *telemetry.Bus
+	// Scenarios runs versioned Scenario documents
+	// (docs/design/scenarios.md). Nil disables the run endpoints.
+	Scenarios *scenario.Runner
 	Log       *slog.Logger
 
 	// UI serves the browser application. Nil serves the API only, which is
@@ -98,6 +103,7 @@ func New(d Deps) *Server {
 		peers:     d.Peers,
 		activity:  d.Activity,
 		telemetry: d.Telemetry,
+		scenarios: d.Scenarios,
 		peerFails: newPeerFailTracker(d.Telemetry),
 		log:       log,
 		mux:       http.NewServeMux(),
@@ -127,6 +133,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/machines/{id}/activity", s.remoteHTTP(s.handleActivity))
 	s.mux.HandleFunc("GET /api/activity", s.handleAllActivity)
 	s.mux.HandleFunc("GET /api/telemetry", s.handleTelemetry)
+	s.mux.HandleFunc("GET /api/scenarios/runs", s.handleScenarioRuns)
+	s.mux.HandleFunc("POST /api/scenarios/runs", s.handleScenarioRunCreate)
+	s.mux.HandleFunc("GET /api/scenarios/runs/{id}", s.handleScenarioRun)
+	s.mux.HandleFunc("POST /api/scenarios/runs/{id}/cancel", s.handleScenarioRunCancel)
+	s.mux.HandleFunc("GET /api/scenarios/runs/{id}/evidence/{name}", s.handleScenarioEvidence)
 	s.mux.HandleFunc("GET /api/config", s.handleConfig)
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
 

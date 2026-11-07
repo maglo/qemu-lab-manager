@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - "api - accept a versioned Scenario document and run power, serial,
+    keys, screen, HTTP and evidence steps
+    (https://github.com/maglo/qemu-lab-manager/issues/85)."
