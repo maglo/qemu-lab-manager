@@ -253,13 +253,20 @@ func runIDFromLease(leaseAs string) string {
 func (run *Run) snapshot() *Run {
 	run.mu.Lock()
 	defer run.mu.Unlock()
-	cp := *run
-	cp.Steps = append([]StepResult(nil), run.Steps...)
-	cp.Evidence = append([]string(nil), run.Evidence...)
-	cp.created = append([]string(nil), run.created...)
-	cp.cancel = nil
-	cp.doc = Document{}
-	return &cp
+	return &Run{
+		ID:         run.ID,
+		Status:     run.Status,
+		Name:       run.Name,
+		APIVersion: run.APIVersion,
+		LeaseAs:    run.LeaseAs,
+		Step:       run.Step,
+		StepName:   run.StepName,
+		Error:      run.Error,
+		StartedAt:  run.StartedAt,
+		FinishedAt: run.FinishedAt,
+		Steps:      append([]StepResult(nil), run.Steps...),
+		Evidence:   append([]string(nil), run.Evidence...),
+	}
 }
 
 func (r *Runner) execute(ctx context.Context, run *Run) {
