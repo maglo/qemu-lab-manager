@@ -191,7 +191,8 @@ A directory. One machine is one YAML file in it, and the file name is the
 machine `id`:
 
 ```yaml
-# /var/lib/labview/inventory.d/el9-build.yaml
+# /etc/labview/inventory.d/el9-build.yaml
+# (a bootc node uses /var/lib/labview/inventory.d instead)
 name: el9-build
 host: kvm01
 vnc: 10.20.0.11:5901

@@ -136,8 +136,8 @@ sparse disk, and names the unit `qemu-vm@{id}.service`. The node image
 ships that template unit. Destroy requires the write lease, stops the
 unit, and removes the files.
 
-`-machines-dir` empty disables create and destroy. The default is
-`/var/lib/labview/machines`.
+`-machines-dir` empty disables create and destroy. The bootc node
+image sets it to `/var/lib/labview/machines`.
 
 ---
 

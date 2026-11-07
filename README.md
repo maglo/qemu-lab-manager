@@ -42,7 +42,7 @@ layer exists, and how to add a check.
 
 ## Run
 
-    ./labview -inventory /var/lib/labview/inventory.d -host-access local
+    ./labview -inventory /etc/labview/inventory.d -host-access local
 
     ./labview -help            # every setting, with its default
 

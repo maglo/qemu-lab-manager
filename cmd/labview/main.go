@@ -72,13 +72,20 @@ func run(args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// When LCM is on, create the inventory and machines directories so a fresh
+	// node can start empty. Otherwise the operator owns the inventory path.
+	if cfg.MachinesDir != "" {
+		if err := os.MkdirAll(cfg.InventoryDir, 0o755); err != nil {
+			return fmt.Errorf("inventory %s: %w", cfg.InventoryDir, err)
+		}
+		if err := os.MkdirAll(cfg.MachinesDir, 0o750); err != nil {
+			return fmt.Errorf("machines-dir %s: %w", cfg.MachinesDir, err)
+		}
+	}
+
 	// The inventory must load before anything else: starting with no
 	// machines because the operator fat-fingered a file would look like a
-	// working but empty lab. Create the directory when it is missing so a
-	// fresh node with LCM enabled can start empty.
-	if err := os.MkdirAll(cfg.InventoryDir, 0o755); err != nil {
-		return fmt.Errorf("inventory %s: %w", cfg.InventoryDir, err)
-	}
+	// working but empty lab.
 	watcher, err := inventory.NewWatcher(cfg.InventoryDir, cfg.InventoryRescan, log)
 	if err != nil {
 		return fmt.Errorf("inventory %s: %w", cfg.InventoryDir, err)
@@ -120,9 +127,6 @@ func run(args []string) error {
 
 	var life *lifecycle.Manager
 	if cfg.MachinesDir != "" {
-		if err := os.MkdirAll(cfg.MachinesDir, 0o750); err != nil {
-			return fmt.Errorf("machines-dir %s: %w", cfg.MachinesDir, err)
-		}
 		life = lifecycle.New(lifecycle.Options{
 			MachinesDir:  cfg.MachinesDir,
 			InventoryDir: cfg.InventoryDir,
