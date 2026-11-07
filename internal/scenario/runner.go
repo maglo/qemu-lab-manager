@@ -75,24 +75,24 @@ func New(d Deps) *Runner {
 
 // Run is one execution of a Scenario document.
 type Run struct {
-	ID         string      `json:"id"`
-	Status     string      `json:"status"`
-	Name       string      `json:"name"`
-	APIVersion string      `json:"apiVersion"`
-	LeaseAs    string      `json:"leaseAs"`
-	Step       int         `json:"step"`
-	StepName   string      `json:"stepName,omitempty"`
-	Error      string      `json:"error,omitempty"`
-	StartedAt  time.Time   `json:"startedAt"`
-	FinishedAt time.Time   `json:"finishedAt,omitzero"`
+	ID         string       `json:"id"`
+	Status     string       `json:"status"`
+	Name       string       `json:"name"`
+	APIVersion string       `json:"apiVersion"`
+	LeaseAs    string       `json:"leaseAs"`
+	Step       int          `json:"step"`
+	StepName   string       `json:"stepName,omitempty"`
+	Error      string       `json:"error,omitempty"`
+	StartedAt  time.Time    `json:"startedAt"`
+	FinishedAt time.Time    `json:"finishedAt,omitzero"`
 	Steps      []StepResult `json:"steps,omitempty"`
-	Evidence   []string    `json:"evidence,omitempty"`
+	Evidence   []string     `json:"evidence,omitempty"`
 
-	doc       Document
-	created   []string
-	cancel    context.CancelFunc
-	dir       string
-	mu        sync.Mutex
+	doc     Document
+	created []string
+	cancel  context.CancelFunc
+	dir     string
+	mu      sync.Mutex
 }
 
 // StepResult is the outcome of one step.

@@ -10,7 +10,7 @@ hardware stay in [`cluster.md`](cluster.md) section 4. The console
 wall, the lease and interactive serial stay in [`labview.md`](labview.md).
 
 Status: design with a v1 runner under
-https://github.com/maglo/qemu-lab-manager/issues/85.
+https://github.com/maglo/qemu-lab-manager/issues/88.
 The document format was locked under
 https://github.com/maglo/qemu-lab-manager/issues/82.
 
