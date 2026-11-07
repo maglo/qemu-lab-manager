@@ -49,12 +49,11 @@ port or put a proxy in front, as `deploy/nginx-labview.conf` shows.
 
 ## Machine create and destroy
 
-`POST /api/machines` creates a machine. `DELETE /api/machines/{id}`
-destroys one the API created. The image ships `qemu-vm@.service`; power
-start runs that unit. See `docs/design/cluster.md` section 4.
+`POST /api/machines` creates a machine. `PATCH` updates desired
+hardware. `DELETE /api/machines/{id}` destroys one the API created.
+The image ships `qemu-vm@.service` and swtpm helpers for TPM machines.
+See `docs/design/cluster.md` section 4.
 
 ## What this image does not do yet
 
-- Join a multi-node cluster.
 - Auto-extend capacity.
-- Backing-image create (`image` field).

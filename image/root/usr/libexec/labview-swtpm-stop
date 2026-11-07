@@ -1,0 +1,13 @@
+#!/bin/bash
+# Stop swtpm for a labview-managed machine.
+set -euo pipefail
+id="${1:?machine id}"
+pid="/var/lib/labview/machines/${id}/swtpm.pid"
+sock="/var/lib/labview/machines/${id}/swtpm.sock"
+
+if [[ -f "${pid}" ]]; then
+	kill "$(cat "${pid}")" 2>/dev/null || true
+	rm -f "${pid}"
+fi
+rm -f "${sock}"
+exit 0

@@ -123,6 +123,49 @@ func (m *Manager) Screenshot(ctx context.Context, t Target) ([]byte, error) {
 	return png, nil
 }
 
+// DeviceAdd attaches a live device (hotplug).
+func (m *Manager) DeviceAdd(ctx context.Context, t Target, driver string, props map[string]any) error {
+	return m.with(ctx, t, func(ctx context.Context, c *Client) error {
+		return c.DeviceAdd(ctx, driver, props)
+	})
+}
+
+// DeviceDel removes a live device by id.
+func (m *Manager) DeviceDel(ctx context.Context, t Target, id string) error {
+	return m.with(ctx, t, func(ctx context.Context, c *Client) error {
+		return c.DeviceDel(ctx, id)
+	})
+}
+
+// HotplugUSBStorage adds a usb-storage device backed by a host file.
+func (m *Manager) HotplugUSBStorage(ctx context.Context, t Target, id, image string) error {
+	if id == "" || image == "" {
+		return errors.New("usb-storage needs id and image")
+	}
+	fileNode := "file-" + id
+	driveNode := "drive-" + id
+	return m.with(ctx, t, func(ctx context.Context, c *Client) error {
+		if err := c.BlockdevAdd(ctx, map[string]any{
+			"driver":    "file",
+			"filename":  image,
+			"node-name": fileNode,
+		}); err != nil {
+			return err
+		}
+		if err := c.BlockdevAdd(ctx, map[string]any{
+			"driver":    "raw",
+			"node-name": driveNode,
+			"file":      fileNode,
+		}); err != nil {
+			return err
+		}
+		return c.DeviceAdd(ctx, "usb-storage", map[string]any{
+			"id":    id,
+			"drive": driveNode,
+		})
+	})
+}
+
 // with runs one exchange on a machine's control socket, one caller at a time.
 func (m *Manager) with(ctx context.Context, t Target, fn func(context.Context, *Client) error) error {
 	if t.Address == "" {

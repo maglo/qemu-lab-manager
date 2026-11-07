@@ -2,6 +2,7 @@
 #
 # labview writes /var/lib/labview/machines/%i/qemu.argv and the inventory
 # names this unit as qemu-vm@%i.service (docs/design/cluster.md section 4).
+# When the desired Spec asks for a TPM, swtpm is started first.
 
 [Unit]
 Description=QEMU lab machine %i
@@ -12,7 +13,10 @@ Wants=network-online.target
 Type=simple
 User=qemu
 Group=qemu
+# Start swtpm when the machine directory holds a tpm/ state dir.
+ExecStartPre=/usr/libexec/labview-swtpm-start %i
 ExecStart=/usr/bin/qemu-system-x86_64 @/var/lib/labview/machines/%i/qemu.argv
+ExecStopPost=/usr/libexec/labview-swtpm-stop %i
 Restart=on-failure
 RestartSec=2s
 TimeoutStopSec=30s

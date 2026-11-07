@@ -119,6 +119,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/machines", s.handleMachines)
 	s.mux.HandleFunc("POST /api/machines", s.handleCreateMachine)
 	s.mux.HandleFunc("GET /api/machines/{id}", s.remoteHTTP(s.handleMachine))
+	s.mux.HandleFunc("PATCH /api/machines/{id}", s.remoteHTTP(s.handlePatchMachine))
 	s.mux.HandleFunc("DELETE /api/machines/{id}", s.remoteHTTP(s.handleDestroyMachine))
 	s.mux.HandleFunc("POST /api/machines/{id}/lease", s.remoteHTTP(s.handleLease))
 	s.mux.HandleFunc("GET /ws/console/{id}", s.handleConsoleWS)
@@ -127,6 +128,8 @@ func (s *Server) routes() {
 	// The tabs of section 8, each also reachable as JSON.
 	s.mux.HandleFunc("POST /api/machines/{id}/power", s.remoteHTTP(s.handlePower))
 	s.mux.HandleFunc("POST /api/machines/{id}/keys", s.remoteHTTP(s.handleKeys))
+	s.mux.HandleFunc("POST /api/machines/{id}/devices", s.remoteHTTP(s.handleAddDevice))
+	s.mux.HandleFunc("DELETE /api/machines/{id}/devices/{deviceId}", s.remoteHTTP(s.handleRemoveDevice))
 	s.mux.HandleFunc("GET /api/machines/{id}/screenshot", s.remoteHTTP(s.handleScreenshot))
 	s.mux.HandleFunc("GET /api/machines/{id}/recordings", s.remoteHTTP(s.handleRecordings))
 	s.mux.HandleFunc("GET /api/machines/{id}/recordings/{name}", s.remoteHTTP(s.handleRecording))
@@ -164,7 +167,7 @@ func (s *Server) routes() {
 func (s *Server) handleNoEndpoint(w http.ResponseWriter, r *http.Request) {
 	// The mux answers 405 only while nothing else matches, and this matches
 	// everything under the prefix, so the method check lands here now.
-	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodDelete} {
+	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodDelete} {
 		if method == r.Method {
 			continue
 		}

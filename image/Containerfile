@@ -36,11 +36,14 @@ RUN dnf -y install \
 	qemu-system-x86 \
 	qemu-img \
 	edk2-ovmf \
+	swtpm \
+	swtpm-tools \
 	polkit \
 	&& dnf clean all
 
 COPY --from=build /out/labview /usr/bin/labview
 COPY image/root/ /
+RUN chmod 0755 /usr/libexec/labview-swtpm-start /usr/libexec/labview-swtpm-stop
 
 # sysusers and tmpfiles create the labview account and state dirs on first
 # boot. Enable the unit in the image so a fresh node serves the wall.

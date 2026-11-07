@@ -1,0 +1,14 @@
+---
+major_changes:
+  - "labview - machine create accepts firmware, multi-disk, TPM, USB
+    and CCID on ``lifecycle.Spec``. ``PATCH /api/machines/{id}``
+    updates desired state. Hotplug uses
+    ``POST/DELETE /api/machines/{id}/devices``
+    (https://github.com/maglo/qemu-lab-manager/issues/87)."
+minor_changes:
+  - "labview - ``GET /api/machines/{id}`` returns ``desired`` for
+    API-created machines
+    (https://github.com/maglo/qemu-lab-manager/issues/87)."
+  - "image - the node image installs swtpm and starts it from
+    ``qemu-vm@.service`` when a machine asks for a TPM
+    (https://github.com/maglo/qemu-lab-manager/issues/87)."

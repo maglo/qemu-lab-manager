@@ -1,0 +1,20 @@
+#!/bin/bash
+# Start swtpm for a labview-managed machine when tpm/ exists.
+set -euo pipefail
+id="${1:?machine id}"
+dir="/var/lib/labview/machines/${id}"
+tpm_dir="${dir}/tpm"
+sock="${dir}/swtpm.sock"
+pid="${dir}/swtpm.pid"
+
+if [[ ! -d "${tpm_dir}" ]]; then
+	exit 0
+fi
+
+rm -f "${sock}" "${pid}"
+/usr/bin/swtpm socket \
+	--tpm2 \
+	--tpmstate "dir=${tpm_dir}" \
+	--ctrl "type=unixio,path=${sock}" \
+	--pid "file=${pid}" \
+	--daemon
