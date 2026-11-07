@@ -107,9 +107,11 @@ type Config struct {
 func Default() Config {
 	return Config{
 		Listen:          "127.0.0.1:8080",
-		InventoryDir:    "/var/lib/labview/inventory.d",
+		InventoryDir:    "/etc/labview/inventory.d",
 		InventoryRescan: 2 * time.Second,
-		MachinesDir:     "/var/lib/labview/machines",
+		// MachinesDir is empty by default: create/destroy are opt-in.
+		// The bootc node image passes -machines-dir explicitly.
+		MachinesDir:     "",
 		IdentityHeader:  "X-Forwarded-User",
 		DefaultIdentity: "unidentified",
 

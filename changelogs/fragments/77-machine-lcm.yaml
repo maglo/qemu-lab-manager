@@ -1,10 +1,4 @@
 ---
-breaking_changes:
-  - "labview - the default ``-inventory`` directory is
-    ``/var/lib/labview/inventory.d``, so the API can write machine
-    files on a bootc node. Pass ``-inventory /etc/labview/inventory.d``
-    to keep the old path
-    (https://github.com/maglo/qemu-lab-manager/issues/77)."
 major_changes:
   - "api - ``POST /api/machines`` creates a machine and
     ``DELETE /api/machines/{id}`` destroys an API-created one. Create
@@ -13,7 +7,8 @@ major_changes:
     (https://github.com/maglo/qemu-lab-manager/issues/77)."
 minor_changes:
   - "labview - ``-machines-dir`` holds API-created machine state.
-    Empty disables create and destroy
+    Empty (the default) disables create and destroy. The bootc image
+    sets the path and writes inventory under ``/var/lib/labview``
     (https://github.com/maglo/qemu-lab-manager/issues/77)."
   - "image - ship ``qemu-vm@.service`` for API-created machines
     (https://github.com/maglo/qemu-lab-manager/issues/77)."
