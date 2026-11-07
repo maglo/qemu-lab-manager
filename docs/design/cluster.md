@@ -9,7 +9,7 @@ document of the console wall, the lease, the serial broker and the HTTP
 surface that already ships. Where the two disagree on scope or deploy,
 this document wins.
 
-Status: design. Code follows in slices under
+Status: slices 1-5 ship. Scenarios and auto-extend remain under
 https://github.com/maglo/qemu-lab-manager/issues/72.
 
 ---
@@ -178,12 +178,18 @@ another node. A scenario that needs replace-on-failure says so.
 
 Every node emits:
 
-- Node: up, capacity, machine count, disk free.
-- Machine: phase, power, lease holder, last error.
+- Node: up (machine count, disk free, version, peer count), peer-fail.
+- Machine: created, destroyed, power, lease, denied, attach, detach.
 - Scenario: run id, step, result (kinds in
   [`scenarios.md`](scenarios.md) section 8).
 
-v1 writes JSON events on an API stream and on stdout of the unit.
+`GET /api/telemetry` writes one JSON object per line (NDJSON). The
+handler dumps the recent ring first. It then follows live events until
+the client closes. `?follow=0` dumps the ring and closes. The same
+events are one JSON object per line on the unit's stdout. Activity
+actions feed the machine events. A peer listing failure emits
+`peer-fail` once per distinct error text.
+
 OTLP or a remote sink is a later slice if a lab asks for it. Scenario
 events land with the scenario runner.
 
@@ -233,11 +239,11 @@ join time. Clients do not see it.
 
 Work lands in this order. Each slice has its own issue under #72.
 
-1. This document and the scope fix in `labview.md`.
-2. Fedora bootc image on GHCR; one node; wall for local machines.
-3. Machine create and destroy on one node.
-4. Cluster join; one pane across nodes.
-5. Telemetry stream.
+1. This document and the scope fix in `labview.md`. Done.
+2. Fedora bootc image on GHCR; one node; wall for local machines. Done.
+3. Machine create and destroy on one node. Done.
+4. Cluster join; one pane across nodes. Done.
+5. Telemetry stream. Done.
 6. Scenario object and runner
    (https://github.com/maglo/qemu-lab-manager/issues/82).
 7. Auto-extend of capacity.

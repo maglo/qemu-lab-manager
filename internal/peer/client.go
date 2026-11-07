@@ -79,6 +79,18 @@ func (c *Client) Len() int {
 	return len(c.peers)
 }
 
+// Names returns the configured peer names in order.
+func (c *Client) Names() []string {
+	if c == nil {
+		return nil
+	}
+	out := make([]string, len(c.peers))
+	for i, p := range c.peers {
+		out[i] = p.Name
+	}
+	return out
+}
+
 // Lookup finds a peer by name.
 func (c *Client) Lookup(name string) (Peer, bool) {
 	if c == nil {

@@ -37,6 +37,12 @@ type Event struct {
 // DefaultCapacity is how many events are kept per machine.
 const DefaultCapacity = 200
 
+// Observer sees every recorded event. Telemetry uses this to mirror
+// activity into the cluster event stream (docs/design/cluster.md section 6).
+type Observer interface {
+	ObserveActivity(machine, user, action, detail string)
+}
+
 // Log is a bounded, in-memory history.
 //
 // In memory only, deliberately: this is a debugging convenience, and the
@@ -45,6 +51,7 @@ const DefaultCapacity = 200
 type Log struct {
 	capacity int
 	log      *slog.Logger
+	observe  Observer
 
 	mu     sync.Mutex
 	byID   map[string][]Event
@@ -62,6 +69,16 @@ func New(capacity int, log *slog.Logger) *Log {
 	return &Log{capacity: capacity, log: log, byID: make(map[string][]Event)}
 }
 
+// SetObserver installs a fan-out for Record. Nil clears it.
+func (l *Log) SetObserver(o Observer) {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	l.observe = o
+	l.mu.Unlock()
+}
+
 // Record appends an event and mirrors it to the structured log.
 func (l *Log) Record(ev Event) {
 	if ev.At.IsZero() {
@@ -71,11 +88,23 @@ func (l *Log) Record(ev Event) {
 	l.mu.Lock()
 	l.byID[ev.Machine] = appendBounded(l.byID[ev.Machine], ev, l.capacity)
 	l.recent = appendBounded(l.recent, ev, l.capacity*2)
+	observe := l.observe
 	l.mu.Unlock()
 
 	l.log.Info("activity",
 		"machine", ev.Machine, "user", ev.User, "action", ev.Action,
 		"channel", ev.Channel, "detail", ev.Detail)
+	if observe != nil {
+		detail := ev.Detail
+		if ev.Channel != "" {
+			if detail != "" {
+				detail = ev.Channel + ": " + detail
+			} else {
+				detail = ev.Channel
+			}
+		}
+		observe.ObserveActivity(ev.Machine, ev.User, ev.Action, detail)
+	}
 }
 
 func appendBounded(s []Event, ev Event, capacity int) []Event {

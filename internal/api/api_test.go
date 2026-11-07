@@ -23,6 +23,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/lease"
 	"github.com/maglo/qemu-lab-manager/labview/internal/qmp"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
+	"github.com/maglo/qemu-lab-manager/labview/internal/telemetry"
 	"github.com/maglo/qemu-lab-manager/labview/internal/web"
 )
 
@@ -55,6 +56,7 @@ type harness struct {
 	fakeHost *host.Fake
 	leases   *lease.Manager
 	brokers  *serial.Manager
+	telem    *telemetry.Bus
 	qemu     *fakeQEMU
 	shotDir  string
 	dir      string
@@ -123,6 +125,7 @@ func newHarness(t *testing.T) *harness {
 	qemu := newFakeQEMU(t)
 	cfg.CaptureDir = shotDir
 
+	telem := telemetry.New(telemetry.Options{Capacity: 50})
 	srv := New(Deps{
 		Config:    cfg,
 		Inventory: w,
@@ -131,6 +134,7 @@ func newHarness(t *testing.T) *harness {
 		Hosts:     fakeHost,
 		Control:   qmp.NewManager(qmp.Options{CaptureDir: shotDir, Dial: qemu.dial}),
 		Activity:  activity.New(50, log),
+		Telemetry: telem,
 		Log:       log,
 		// The browser application, because the routes only sit next to
 		// each other when it is there. Registering both is the case that
@@ -139,7 +143,7 @@ func newHarness(t *testing.T) *harness {
 	})
 
 	h := &harness{srv: srv, fakeHost: fakeHost, leases: leases, brokers: brokers,
-		qemu: qemu, shotDir: shotDir, dir: recDir, cancel: cancel}
+		telem: telem, qemu: qemu, shotDir: shotDir, dir: recDir, cancel: cancel}
 	t.Cleanup(func() { cancel(); brokers.Close() })
 	return h
 }

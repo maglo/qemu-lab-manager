@@ -27,6 +27,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/peer"
 	"github.com/maglo/qemu-lab-manager/labview/internal/qmp"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
+	"github.com/maglo/qemu-lab-manager/labview/internal/telemetry"
 	"github.com/maglo/qemu-lab-manager/labview/internal/web"
 )
 
@@ -153,6 +154,12 @@ func run(args []string) error {
 		return fmt.Errorf("ui: %w", err)
 	}
 
+	telem := telemetry.New(telemetry.Options{
+		Capacity: telemetry.DefaultCapacity,
+		Stdout:   telemetry.DefaultStdout(),
+	})
+	act := activity.New(cfg.ActivityCapacity, log)
+
 	srv := api.New(api.Deps{
 		Config:    cfg,
 		Inventory: watcher,
@@ -162,7 +169,8 @@ func run(args []string) error {
 		Control:   control,
 		Life:      life,
 		Peers:     peers,
-		Activity:  activity.New(cfg.ActivityCapacity, log),
+		Activity:  act,
+		Telemetry: telem,
 		Log:       log,
 		UI:        ui,
 	})
@@ -190,6 +198,21 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", cfg.Listen, err)
 	}
+
+	upFields := map[string]any{
+		"version": version,
+		"listen":  ln.Addr().String(),
+		"peers":   peers.Len(),
+	}
+	diskPath := cfg.MachinesDir
+	if diskPath == "" {
+		diskPath = cfg.InventoryDir
+	}
+	if free, ok := telemetry.DiskFreeBytes(diskPath); ok {
+		upFields["diskFreeBytes"] = free
+		upFields["diskPath"] = diskPath
+	}
+	telem.NodeUp(watcher.Current().Len(), upFields)
 
 	log.Info("labview listening",
 		"address", ln.Addr().String(),
