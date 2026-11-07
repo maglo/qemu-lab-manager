@@ -183,6 +183,12 @@ regex-on-output, no "wait for prompt". A harness gets raw bytes and does its
 own matching, in its own language, with its own timeouts. Push that logic
 into a small client package rather than into the protocol.
 
+The scenario runner is the one exception that matches, and only on a
+scenario run. It is not part of interactive attach.
+[`scenarios.md`](scenarios.md) names the run paths. Those paths answer
+404 until that slice ships; this table stays the list of paths that
+exist today.
+
 ---
 
 ## 6. Inventory

@@ -180,10 +180,12 @@ Every node emits:
 
 - Node: up, capacity, machine count, disk free.
 - Machine: phase, power, lease holder, last error.
-- Scenario: run id, step, result.
+- Scenario: run id, step, result (kinds in
+  [`scenarios.md`](scenarios.md) section 8).
 
 v1 writes JSON events on an API stream and on stdout of the unit.
-OTLP or a remote sink is a later slice if a lab asks for it.
+OTLP or a remote sink is a later slice if a lab asks for it. Scenario
+events land with the scenario runner.
 
 Live consoles and serial are observation, not telemetry. They stay on
 their websockets.
@@ -192,12 +194,10 @@ their websockets.
 
 ## 7. Scenarios
 
-A scenario is a document the API accepts. It names:
-
-- Machines to create (or reuse).
-- Ordered steps: power, wait on serial, send keys, HTTP check against
-  a guest address the host knows.
-- Cleanup: destroy or keep.
+A scenario is a versioned document and a run of that document. It
+names machines to create or reuse, ordered steps, asserts, cleanup
+and evidence. [`scenarios.md`](scenarios.md) is the document of that
+interface.
 
 The server still does no expect-regex on serial bytes for interactive
 attach. The scenario runner is the one place that matches output, with
@@ -205,8 +205,16 @@ timeouts the document sets. That keeps
 [`labview.md`](labview.md) section 5's rule for harnesses that are not
 scenarios.
 
-Scenario format (YAML vs JSON, in-repo vs uploaded) is an open
-decision on issue #72.
+Locked for scenarios (see [`scenarios.md`](scenarios.md)):
+
+- `apiVersion: labview.dev/vN` and `kind` on every document.
+- YAML in-repo; JSON on the wire; the API accepts an uploaded run.
+- `Lab` / `Machine` / `Scenario` share the version line.
+- Desired hardware stays on the machine document. Steps only call
+  LCM and machine verbs.
+- Evidence reuses screenshots and serial captures.
+
+Issue: https://github.com/maglo/qemu-lab-manager/issues/82.
 
 ---
 
@@ -228,9 +236,10 @@ Work lands in this order. Each slice has its own issue under #72.
 1. This document and the scope fix in `labview.md`.
 2. Fedora bootc image on GHCR; one node; wall for local machines.
 3. Machine create and destroy on one node.
-4. Cluster join; one pane across nodes (this slice).
+4. Cluster join; one pane across nodes.
 5. Telemetry stream.
-6. Scenario object and runner.
+6. Scenario object and runner
+   (https://github.com/maglo/qemu-lab-manager/issues/82).
 7. Auto-extend of capacity.
 
 ---
@@ -240,8 +249,8 @@ Work lands in this order. Each slice has its own issue under #72.
 Tracked on https://github.com/maglo/qemu-lab-manager/issues/72:
 
 1. How a node auto-extends.
-2. Scenario document format.
-3. Telemetry sink beyond JSON/stdout.
+2. Telemetry sink beyond JSON/stdout.
 
 Locked: registry is GHCR, base is Fedora bootc, binary name is
-`labview`.
+`labview`. Scenario document format is locked in
+[`scenarios.md`](scenarios.md).
