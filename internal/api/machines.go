@@ -149,8 +149,16 @@ func (s *Server) handleMachines(w http.ResponseWriter, r *http.Request) {
 		for _, m := range remote {
 			out = append(out, m)
 		}
+		seenFail := make(map[string]struct{}, len(failed))
 		for _, f := range failed {
 			s.log.Warn("peer machines listing failed", "peer", f.Peer, "error", f.Error)
+			s.peerFails.note(f.Peer, f.Error)
+			seenFail[f.Peer] = struct{}{}
+		}
+		for _, p := range s.peers.Names() {
+			if _, bad := seenFail[p]; !bad {
+				s.peerFails.clear(p)
+			}
 		}
 	}
 
@@ -338,6 +346,7 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		"screenshotEveryMs": s.cfg.CaptureInterval.Milliseconds(),
 		"lifecycle":         s.life != nil && s.life.Enabled(),
 		"peers":             s.peers != nil && s.peers.Len() > 0,
+		"telemetry":         s.telemetry != nil,
 	})
 }
 

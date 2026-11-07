@@ -23,6 +23,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/peer"
 	"github.com/maglo/qemu-lab-manager/labview/internal/qmp"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
+	"github.com/maglo/qemu-lab-manager/labview/internal/telemetry"
 )
 
 // Server wires the pieces together and serves them.
@@ -36,6 +37,8 @@ type Server struct {
 	life      *lifecycle.Manager
 	peers     *peer.Client
 	activity  *activity.Log
+	telemetry *telemetry.Bus
+	peerFails *peerFailTracker
 	log       *slog.Logger
 
 	mux *http.ServeMux
@@ -58,7 +61,10 @@ type Deps struct {
 	Peers *peer.Client
 
 	Activity *activity.Log
-	Log      *slog.Logger
+	// Telemetry is the cluster event bus (docs/design/cluster.md section 6).
+	// Nil disables GET /api/telemetry.
+	Telemetry *telemetry.Bus
+	Log       *slog.Logger
 
 	// UI serves the browser application. Nil serves the API only, which is
 	// all a harness needs.
@@ -78,6 +84,9 @@ func New(d Deps) *Server {
 			Timeout:    d.Config.ControlTimeout,
 		})
 	}
+	if d.Activity != nil && d.Telemetry != nil {
+		d.Activity.SetObserver(d.Telemetry)
+	}
 	s := &Server{
 		cfg:       d.Config,
 		inventory: d.Inventory,
@@ -88,6 +97,8 @@ func New(d Deps) *Server {
 		life:      d.Life,
 		peers:     d.Peers,
 		activity:  d.Activity,
+		telemetry: d.Telemetry,
+		peerFails: newPeerFailTracker(d.Telemetry),
 		log:       log,
 		mux:       http.NewServeMux(),
 		ui:        d.UI,
@@ -115,6 +126,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/machines/{id}/recordings/{name}", s.remoteHTTP(s.handleRecording))
 	s.mux.HandleFunc("GET /api/machines/{id}/activity", s.remoteHTTP(s.handleActivity))
 	s.mux.HandleFunc("GET /api/activity", s.handleAllActivity)
+	s.mux.HandleFunc("GET /api/telemetry", s.handleTelemetry)
 	s.mux.HandleFunc("GET /api/config", s.handleConfig)
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
 

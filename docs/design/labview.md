@@ -153,6 +153,7 @@ another, and neither gets a privileged path.
 | `POST /api/machines/{id}/keys` | Send one chord over the control socket |
 | `GET /api/machines/{id}/screenshot` | One frame of the screen, as PNG |
 | `GET /api/activity` | The activity of every machine |
+| `GET /api/telemetry` | NDJSON events for the node and its machines (cluster.md section 6) |
 | `GET /api/config` | The settings the browser application needs |
 | `GET /ws/console/{id}` | Binary RFB, proxied to the VNC port |
 | `GET /ws/serial/{id}` | Serial stream from the broker, scrollback first |

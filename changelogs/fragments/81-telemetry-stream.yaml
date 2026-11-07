@@ -1,0 +1,10 @@
+---
+major_changes:
+  - "labview - ``GET /api/telemetry`` streams NDJSON events for the
+    node and its machines. The same events are one JSON object per
+    line on stdout
+    (https://github.com/maglo/qemu-lab-manager/issues/81)."
+minor_changes:
+  - "labview - ``GET /api/config`` reports ``telemetry`` when the
+    event bus is on
+    (https://github.com/maglo/qemu-lab-manager/issues/81)."
