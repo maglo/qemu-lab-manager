@@ -12,6 +12,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/host"
 	"github.com/maglo/qemu-lab-manager/labview/internal/inventory"
 	"github.com/maglo/qemu-lab-manager/labview/internal/lease"
+	"github.com/maglo/qemu-lab-manager/labview/internal/peer"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
 )
 
@@ -123,6 +124,9 @@ func unitWhy(u host.Unit) string {
 }
 
 // handleMachines serves the inventory plus liveness and lease holders.
+//
+// Peer machines join the same list under composite ids
+// (docs/design/cluster.md section 5).
 func (s *Server) handleMachines(w http.ResponseWriter, r *http.Request) {
 	states := s.brokers.States()
 	leases := s.leases.All()
@@ -133,11 +137,28 @@ func (s *Server) handleMachines(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	set := s.inventory.Current()
-	out := make([]machineSummary, 0, set.Len())
+	out := make([]any, 0, set.Len())
 	for _, m := range set.Machines() {
 		out = append(out, s.summarise(ctx, m, states, leases))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"machines": out})
+
+	var peerFailed []peer.Failure
+	if s.peers != nil && s.peers.Len() > 0 {
+		remote, failed := s.peers.ListMachines(ctx, s.identity(r))
+		peerFailed = failed
+		for _, m := range remote {
+			out = append(out, m)
+		}
+		for _, f := range failed {
+			s.log.Warn("peer machines listing failed", "peer", f.Peer, "error", f.Error)
+		}
+	}
+
+	body := map[string]any{"machines": out}
+	if len(peerFailed) > 0 {
+		body["peerFailures"] = peerFailed
+	}
+	writeJSON(w, http.StatusOK, body)
 }
 
 // machineRecord is the whole record for one machine: everything the details
@@ -316,6 +337,7 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		"screenshots":       s.control.CaptureEnabled(),
 		"screenshotEveryMs": s.cfg.CaptureInterval.Milliseconds(),
 		"lifecycle":         s.life != nil && s.life.Enabled(),
+		"peers":             s.peers != nil && s.peers.Len() > 0,
 	})
 }
 
@@ -323,9 +345,13 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	// A machine file that does not load leaves the other machines running,
 	// so the only sign of it is the log. Say so here as well, where a
 	// monitor can see it.
-	writeJSON(w, http.StatusOK, map[string]any{
+	body := map[string]any{
 		"ok":       true,
 		"machines": s.inventory.Current().Len(),
 		"failed":   s.inventory.Failed(),
-	})
+	}
+	if s.peers != nil && s.peers.Len() > 0 {
+		body["peers"] = s.peers.Len()
+	}
+	writeJSON(w, http.StatusOK, body)
 }

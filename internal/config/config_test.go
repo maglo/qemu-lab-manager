@@ -38,6 +38,8 @@ func TestBindParsesFlags(t *testing.T) {
 		"-recordings-dir", "/tmp/casts",
 		"-screenshot-dir", "/tmp/shots",
 		"-screenshot-interval", "2s",
+		"-peer", "kvm01=https://kvm01.example/labview",
+		"-cluster-token", "sekrit",
 	})
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
@@ -61,12 +63,16 @@ func TestBindParsesFlags(t *testing.T) {
 	if c.CaptureDir != "/tmp/shots" || c.CaptureInterval != 2*time.Second {
 		t.Errorf("capture settings = %q every %s", c.CaptureDir, c.CaptureInterval)
 	}
+	if len(c.Peers) != 1 || c.Peers[0].Name != "kvm01" || c.ClusterToken != "sekrit" {
+		t.Errorf("peers/token = %+v %q", c.Peers, c.ClusterToken)
+	}
 }
 
 func TestBindRejectsUnknownEnums(t *testing.T) {
 	for _, args := range [][]string{
 		{"-tile-mode", "hologram"},
 		{"-host-access", "libvirt"},
+		{"-peer", "bad"},
 	} {
 		c := Default()
 		fs := flag.NewFlagSet("labview", flag.ContinueOnError)

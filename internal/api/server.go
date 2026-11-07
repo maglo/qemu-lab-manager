@@ -20,6 +20,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/inventory"
 	"github.com/maglo/qemu-lab-manager/labview/internal/lease"
 	"github.com/maglo/qemu-lab-manager/labview/internal/lifecycle"
+	"github.com/maglo/qemu-lab-manager/labview/internal/peer"
 	"github.com/maglo/qemu-lab-manager/labview/internal/qmp"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
 )
@@ -33,6 +34,7 @@ type Server struct {
 	hosts     host.Access
 	control   *qmp.Manager
 	life      *lifecycle.Manager
+	peers     *peer.Client
 	activity  *activity.Log
 	log       *slog.Logger
 
@@ -52,6 +54,8 @@ type Deps struct {
 	Control *qmp.Manager
 	// Life creates and destroys machines. Nil disables those endpoints.
 	Life *lifecycle.Manager
+	// Peers reaches other labview nodes (docs/design/cluster.md section 5).
+	Peers *peer.Client
 
 	Activity *activity.Log
 	Log      *slog.Logger
@@ -82,6 +86,7 @@ func New(d Deps) *Server {
 		hosts:     d.Hosts,
 		control:   control,
 		life:      d.Life,
+		peers:     d.Peers,
 		activity:  d.Activity,
 		log:       log,
 		mux:       http.NewServeMux(),
@@ -92,22 +97,23 @@ func New(d Deps) *Server {
 }
 
 func (s *Server) routes() {
-	// The section 5 surface.
+	// The section 5 surface. Machine-scoped HTTP forwards to a peer when
+	// the id is composite (docs/design/cluster.md section 5).
 	s.mux.HandleFunc("GET /api/machines", s.handleMachines)
 	s.mux.HandleFunc("POST /api/machines", s.handleCreateMachine)
-	s.mux.HandleFunc("GET /api/machines/{id}", s.handleMachine)
-	s.mux.HandleFunc("DELETE /api/machines/{id}", s.handleDestroyMachine)
-	s.mux.HandleFunc("POST /api/machines/{id}/lease", s.handleLease)
+	s.mux.HandleFunc("GET /api/machines/{id}", s.remoteHTTP(s.handleMachine))
+	s.mux.HandleFunc("DELETE /api/machines/{id}", s.remoteHTTP(s.handleDestroyMachine))
+	s.mux.HandleFunc("POST /api/machines/{id}/lease", s.remoteHTTP(s.handleLease))
 	s.mux.HandleFunc("GET /ws/console/{id}", s.handleConsoleWS)
 	s.mux.HandleFunc("GET /ws/serial/{id}", s.handleSerialWS)
 
 	// The tabs of section 8, each also reachable as JSON.
-	s.mux.HandleFunc("POST /api/machines/{id}/power", s.handlePower)
-	s.mux.HandleFunc("POST /api/machines/{id}/keys", s.handleKeys)
-	s.mux.HandleFunc("GET /api/machines/{id}/screenshot", s.handleScreenshot)
-	s.mux.HandleFunc("GET /api/machines/{id}/recordings", s.handleRecordings)
-	s.mux.HandleFunc("GET /api/machines/{id}/recordings/{name}", s.handleRecording)
-	s.mux.HandleFunc("GET /api/machines/{id}/activity", s.handleActivity)
+	s.mux.HandleFunc("POST /api/machines/{id}/power", s.remoteHTTP(s.handlePower))
+	s.mux.HandleFunc("POST /api/machines/{id}/keys", s.remoteHTTP(s.handleKeys))
+	s.mux.HandleFunc("GET /api/machines/{id}/screenshot", s.remoteHTTP(s.handleScreenshot))
+	s.mux.HandleFunc("GET /api/machines/{id}/recordings", s.remoteHTTP(s.handleRecordings))
+	s.mux.HandleFunc("GET /api/machines/{id}/recordings/{name}", s.remoteHTTP(s.handleRecording))
+	s.mux.HandleFunc("GET /api/machines/{id}/activity", s.remoteHTTP(s.handleActivity))
 	s.mux.HandleFunc("GET /api/activity", s.handleAllActivity)
 	s.mux.HandleFunc("GET /api/config", s.handleConfig)
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
@@ -182,6 +188,29 @@ func sanitiseIdentity(v string) string {
 		v = v[:maxLen]
 	}
 	return v
+}
+
+// remoteHTTP forwards a machine-scoped request to a peer when the path id
+// is composite. Local ids fall through to the wrapped handler.
+func (s *Server) remoteHTTP(local http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.peers != nil && s.peers.ProxyMachine(w, r, s.identity(r)) {
+			return
+		}
+		local(w, r)
+	}
+}
+
+// rejectRemoteWS refuses a websocket for a peer machine until forwarding
+// lands in a later slice.
+func (s *Server) rejectRemoteWS(w http.ResponseWriter, r *http.Request) bool {
+	id := r.PathValue("id")
+	if _, _, ok := peer.SplitID(id); !ok {
+		return false
+	}
+	writeError(w, http.StatusNotImplemented,
+		"websocket forwarding for remote machine %q is not available yet", id)
+	return true
 }
 
 // machine resolves the {id} path value against the live inventory.
