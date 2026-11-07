@@ -117,6 +117,10 @@ The console, serial, screenshot and key endpoints stay as
 
 ### Create document
 
+The create body is `lifecycle.Spec`. Scenario documents pass the same
+shape under `spec.machines[].create`
+([`scenarios.md`](scenarios.md)).
+
 ```json
 {
   "id": "el9-build",
@@ -125,19 +129,48 @@ The console, serial, screenshot and key endpoints stay as
   "vcpus": 2,
   "diskGb": 20,
   "notes": "",
-  "image": ""
+  "image": "",
+  "firmware": "uefi",
+  "disks": [
+    {"name": "root", "sizeGb": 20},
+    {"name": "data", "sizeGb": 40, "bus": "scsi"}
+  ],
+  "tpm": {"version": "2.0", "model": "tpm-tis"},
+  "usb": {"controllers": 1, "devices": [{"id": "tablet0", "kind": "tablet"}]},
+  "ccid": [{"id": "reader0"}]
 }
 ```
 
-`image` empty means a blank raw disk under
-`/var/lib/labview/machines/{id}/`. A backing image path is a later
-slice. Create writes the inventory entry, a `qemu.argv` file and a
-sparse disk, and names the unit `qemu-vm@{id}.service`. The node image
-ships that template unit. Destroy requires the write lease, stops the
-unit, and removes the files.
+| Field | Meaning |
+|---|---|
+| `diskGb` / `image` | Shorthand primary disk when `disks` is empty. `image` is an existing file; empty creates a blank sparse raw disk. |
+| `firmware` | `bios` (default) or `uefi` (OVMF on the node image). |
+| `disks` | One or more disks (`virtio`, `scsi`, or `ide`). |
+| `tpm` | Emulator-backed TPM; the unit starts `swtpm` when `tpm/` exists. |
+| `usb` | XHCI controllers and boot-time USB devices. |
+| `ccid` | Smart-card readers at boot (`usb-ccid`). |
 
-`-machines-dir` empty disables create and destroy. The bootc node
-image sets it to `/var/lib/labview/machines`.
+Create writes the inventory entry, `qemu.argv`, disks and `spec.json`,
+and names the unit `qemu-vm@{id}.service`. Destroy requires the write
+lease, stops the unit, and removes the files.
+
+`PATCH /api/machines/{id}` updates desired state, rewrites `qemu.argv`,
+and returns `needsRestart` when the running QEMU must be restarted.
+`GET /api/machines/{id}` includes `desired` for managed machines.
+Reported hardware stays in `details` from host inspect.
+
+Hotplug (write lease required):
+
+| Method | Path | Meaning |
+|---|---|---|
+| `POST` | `/api/machines/{id}/devices` | Insert USB tablet/storage/CCID, or inject a CCID card. |
+| `DELETE` | `/api/machines/{id}/devices/{deviceId}` | Remove a hotplugged device. |
+
+Timed actions, asserts and evidence stay in the scenario runner. When
+hotplug exists, scenarios add a step that posts these paths.
+
+`-machines-dir` empty disables create, destroy and patch. The bootc
+node image sets it to `/var/lib/labview/machines`.
 
 ---
 

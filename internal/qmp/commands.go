@@ -52,6 +52,37 @@ func (c *Client) Screendump(ctx context.Context, path string) error {
 	return err
 }
 
+// DeviceAdd attaches a device with QEMU device_add.
+func (c *Client) DeviceAdd(ctx context.Context, driver string, props map[string]any) error {
+	if driver == "" {
+		return errors.New("device driver is required")
+	}
+	args := map[string]any{"driver": driver}
+	for k, v := range props {
+		args[k] = v
+	}
+	_, err := c.Execute(ctx, "device_add", args)
+	return err
+}
+
+// DeviceDel removes a device by id.
+func (c *Client) DeviceDel(ctx context.Context, id string) error {
+	if id == "" {
+		return errors.New("device id is required")
+	}
+	_, err := c.Execute(ctx, "device_del", map[string]any{"id": id})
+	return err
+}
+
+// BlockdevAdd registers a block node for hotplug (usb-storage).
+func (c *Client) BlockdevAdd(ctx context.Context, node map[string]any) error {
+	if node == nil {
+		return errors.New("blockdev node is required")
+	}
+	_, err := c.Execute(ctx, "blockdev-add", node)
+	return err
+}
+
 // ValidateKeys reports a chord labview will not send.
 func ValidateKeys(keys []string) error {
 	if len(keys) == 0 {

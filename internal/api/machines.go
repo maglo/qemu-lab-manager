@@ -12,6 +12,7 @@ import (
 	"github.com/maglo/qemu-lab-manager/labview/internal/host"
 	"github.com/maglo/qemu-lab-manager/labview/internal/inventory"
 	"github.com/maglo/qemu-lab-manager/labview/internal/lease"
+	"github.com/maglo/qemu-lab-manager/labview/internal/lifecycle"
 	"github.com/maglo/qemu-lab-manager/labview/internal/peer"
 	"github.com/maglo/qemu-lab-manager/labview/internal/serial"
 )
@@ -177,6 +178,10 @@ type machineRecord struct {
 
 	Details host.Details `json:"details"`
 
+	// Desired is the LCM create/PATCH document when this node manages
+	// the machine (docs/design/cluster.md section 4).
+	Desired *lifecycle.Spec `json:"desired,omitempty"`
+
 	// Inventory is the machine's file as written, plus the id its name
 	// gives, minus the fields that never reach a browser.
 	Inventory map[string]any `json:"inventory"`
@@ -206,6 +211,15 @@ func (s *Server) handleMachine(w http.ResponseWriter, r *http.Request) {
 		details.Warnings = append(details.Warnings, "host inspection failed: "+err.Error())
 	}
 	rec.Details = details
+
+	if s.life != nil && s.life.Managed(m.ID) {
+		if desired, err := s.life.Desired(m.ID); err == nil {
+			rec.Desired = &desired
+		} else {
+			details.Warnings = append(details.Warnings, "desired state: "+err.Error())
+			rec.Details = details
+		}
+	}
 
 	if recs, err := serial.ListRecordings(s.cfg.TranscriptDir, m.ID); err == nil {
 		rec.Recordings = recs

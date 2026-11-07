@@ -143,8 +143,11 @@ another, and neither gets a privileged path.
 |---|---|
 | `GET /api/machines` | Inventory plus liveness and current lease holder |
 | `POST /api/machines` | Create a machine (cluster.md section 4) |
-| `GET /api/machines/{id}` | The whole record: details, disks, network, unit, recordings, activity |
+| `GET /api/machines/{id}` | The whole record: details, desired, disks, network, unit, recordings, activity |
+| `PATCH /api/machines/{id}` | Update desired hardware on an API-created machine |
 | `DELETE /api/machines/{id}` | Destroy an API-created machine |
+| `POST /api/machines/{id}/devices` | Hotplug USB or CCID (cluster.md section 4) |
+| `DELETE /api/machines/{id}/devices/{deviceId}` | Remove a hotplugged device |
 | `GET /api/machines/{id}/recordings` | Past serial captures |
 | `GET /api/machines/{id}/recordings/{name}` | One capture, asciicast v2 |
 | `GET /api/machines/{id}/activity` | Who attached when, who holds control |

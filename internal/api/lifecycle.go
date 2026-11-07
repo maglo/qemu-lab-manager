@@ -11,6 +11,7 @@ import (
 )
 
 const createBodyLimit = 64 << 10
+const patchBodyLimit = 64 << 10
 
 func (s *Server) handleCreateMachine(w http.ResponseWriter, r *http.Request) {
 	if s.life == nil || !s.life.Enabled() {
@@ -104,4 +105,58 @@ func (s *Server) handleDestroyMachine(w http.ResponseWriter, r *http.Request) {
 		Machine: m.ID, User: user, Action: activity.ActionDestroyed,
 	})
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "id": m.ID})
+}
+
+func (s *Server) handlePatchMachine(w http.ResponseWriter, r *http.Request) {
+	if s.life == nil || !s.life.Enabled() {
+		writeError(w, http.StatusNotImplemented, "machine lifecycle is disabled on this labview")
+		return
+	}
+	m, ok := s.machine(w, r)
+	if !ok {
+		return
+	}
+	user := s.identity(r)
+
+	if !s.life.Managed(m.ID) {
+		writeError(w, http.StatusConflict,
+			"machine %q was not created by the lifecycle API, so labview will not patch it", m.ID)
+		return
+	}
+	if !s.leases.CanWrite(m.ID, user) {
+		s.writeLeaseDenied(w, m.ID, user, "patch without the lease")
+		return
+	}
+
+	var patch lifecycle.PatchSpec
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, patchBodyLimit)).Decode(&patch); err != nil {
+		writeError(w, http.StatusBadRequest, "body is not valid JSON: %s", err.Error())
+		return
+	}
+
+	result, err := s.life.Patch(r.Context(), m.ID, patch)
+	if err != nil {
+		status := http.StatusBadRequest
+		switch {
+		case errors.Is(err, lifecycle.ErrDisabled):
+			status = http.StatusNotImplemented
+		case errors.Is(err, lifecycle.ErrNotManaged):
+			status = http.StatusConflict
+		}
+		writeError(w, status, "%s", err.Error())
+		return
+	}
+
+	s.activity.Record(activity.Event{
+		Machine: m.ID, User: user, Action: "patched",
+		Detail: fmtNeedsRestart(result.NeedsRestart),
+	})
+	writeJSON(w, http.StatusOK, result)
+}
+
+func fmtNeedsRestart(v bool) string {
+	if v {
+		return "needsRestart"
+	}
+	return "live"
 }
