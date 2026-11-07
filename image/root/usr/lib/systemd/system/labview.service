@@ -1,0 +1,53 @@
+# labview -- console wall for the QEMU lab on a bootc node.
+#
+# Paths match the image layout under image/root/. Design section 10 and
+# docs/design/cluster.md section 3 give the reasons.
+
+[Unit]
+Description=labview -- console wall for the QEMU lab
+Documentation=https://github.com/maglo/qemu-lab-manager
+After=network-online.target dbus.service systemd-tmpfiles-setup.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/labview \
+    -listen 127.0.0.1:8080 \
+    -inventory /etc/labview/inventory.d \
+    -recordings-dir /var/lib/labview/recordings \
+    -screenshot-dir /var/lib/labview/screenshots \
+    -host-access local
+
+User=labview
+Group=labview
+SupplementaryGroups=qemu
+
+Restart=on-failure
+RestartSec=2s
+LimitNOFILE=8192
+KillSignal=SIGTERM
+TimeoutStopSec=15s
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/labview
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+ProtectProc=default
+ProcSubset=all
+
+[Install]
+WantedBy=multi-user.target

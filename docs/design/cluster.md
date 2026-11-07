@@ -50,14 +50,14 @@ capacity. A scenario owns a run. One product.
 
 ## 3. The bootc image
 
-The node boots from a bootc image published to Quay.io. The image holds:
+The node boots from a Fedora bootc image. The image holds:
 
 - A Linux host with QEMU and the units labview needs.
 - The `labview` binary and its unit.
-- The agent that joins the cluster.
+- The agent that joins the cluster (later slice).
 
 labview runs as a systemd unit on that host. It is not a container
-process on a foreign OS.
+process on a foreign OS. The sources live under `image/`.
 
 ### Why not a container on the hypervisor
 
@@ -73,14 +73,19 @@ real unit boundary. The image is still how we ship and upgrade.
 
 | Item | Value |
 |---|---|
-| Registry | Quay.io |
-| Repository | Decided when the first image builds. See issue #72. |
-| Base | Decided with the first image (CentOS Stream, Fedora or RHEL bootc). |
+| Registry | GitHub Container Registry (`ghcr.io`) |
+| Image | `ghcr.io/maglo/qemu-lab-manager/labview-node` |
+| Visibility | Public |
+| Base | `quay.io/fedora/fedora-bootc:45` |
 | Architectures | x86_64 first. aarch64 when a node needs it. |
 
-A release of the cluster product publishes an image tag. The Go binary
-release on GitHub stays for developers who run labview on a laptop
-against a fake lab.
+GHCR stores and serves container images at no charge on the free tier
+today. Public packages stay free if that policy narrows to public
+only. Quay is not required while that holds.
+
+A push to `main` publishes `:latest`. A `v*` tag publishes that
+version. The Go binary release on GitHub stays for developers who run
+labview on a laptop against a fake lab.
 
 ---
 
@@ -186,7 +191,7 @@ join time. Clients do not see it.
 Work lands in this order. Each slice has its own issue under #72.
 
 1. This document and the scope fix in `labview.md`.
-2. bootc image skeleton on Quay; one node; wall for local machines.
+2. Fedora bootc image on GHCR; one node; wall for local machines.
 3. Machine create and destroy on one node.
 4. Cluster join; one pane across nodes.
 5. Telemetry stream.
@@ -199,9 +204,9 @@ Work lands in this order. Each slice has its own issue under #72.
 
 Tracked on https://github.com/maglo/qemu-lab-manager/issues/72:
 
-1. Quay repository name and visibility.
-2. Base bootc image.
-3. How a node auto-extends.
-4. Scenario document format.
-5. Telemetry sink beyond JSON/stdout.
-6. Whether the binary keeps the name `labview`.
+1. How a node auto-extends.
+2. Scenario document format.
+3. Telemetry sink beyond JSON/stdout.
+
+Locked: registry is GHCR, base is Fedora bootc, binary name is
+`labview`.
