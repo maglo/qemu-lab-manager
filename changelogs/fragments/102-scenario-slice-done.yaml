@@ -1,0 +1,4 @@
+---
+trivial:
+  - "docs - mark cluster slice 6 done and point at scenario follow-ons
+    (https://github.com/maglo/qemu-lab-manager/issues/102)."

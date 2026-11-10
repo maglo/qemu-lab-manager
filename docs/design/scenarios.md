@@ -9,10 +9,8 @@ document of the scenario interface. Machine create and desired
 hardware stay in [`cluster.md`](cluster.md) section 4. The console
 wall, the lease and interactive serial stay in [`labview.md`](labview.md).
 
-Status: design with a v1 runner under
-https://github.com/maglo/qemu-lab-manager/issues/88.
-The document format was locked under
-https://github.com/maglo/qemu-lab-manager/issues/82.
+Status: v1 runner ships (#88). Document format locked (#82). Follow-ons:
+hotplug step (#100), labviewctl (#101).
 
 ---
 
