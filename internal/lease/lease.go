@@ -390,21 +390,18 @@ func (m *Manager) Subscribe() (<-chan Event, func()) {
 	}
 }
 
-// publish fans events out to subscribers. Never called with the lock held: a
-// subscriber is free to call back into the manager.
+// publish fans events out to subscribers. Never called with the lock held.
+// It holds the lock for the sends, so a stop function cannot close a channel
+// that a send is about to use. The sends do not block.
 func (m *Manager) publish(events []Event) {
 	if len(events) == 0 {
 		return
 	}
 	m.mu.Lock()
-	subs := make([]chan Event, 0, len(m.subs))
-	for _, ch := range m.subs {
-		subs = append(subs, ch)
-	}
-	m.mu.Unlock()
+	defer m.mu.Unlock()
 
 	for _, ev := range events {
-		for _, ch := range subs {
+		for _, ch := range m.subs {
 			select {
 			case ch <- ev:
 			default: // a subscriber that cannot keep up misses transitions
