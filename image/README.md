@@ -54,7 +54,37 @@ hardware. `DELETE /api/machines/{id}` destroys one the API created.
 The image ships `qemu-vm@.service` and swtpm helpers for TPM machines.
 See `docs/design/cluster.md` section 4.
 
-## What this image does not do yet
+## Join a cluster at boot
 
-- Read cloud-init user data.
-- Join a cluster at boot.
+The image has cloud-init. The labview unit reads `LABVIEW_ARGS` from
+`/etc/labview/node.env`. A flag in `LABVIEW_ARGS` replaces the same
+flag of the unit. See `docs/design/cluster.md` section 5.
+
+Give each node this user data. Change the addresses, the name and the
+token.
+
+```yaml
+#cloud-config
+write_files:
+  - path: /etc/labview/cluster-token
+    owner: root:labview
+    permissions: '0640'
+    content: |
+      change-this-token
+  - path: /etc/labview/node.env
+    permissions: '0644'
+    content: |
+      LABVIEW_ARGS=-listen 0.0.0.0:8080 -cluster-token-file /etc/labview/cluster-token -join http://10.0.0.1:8080 -node-name node2 -advertise-url http://10.0.0.2:8080
+```
+
+The API node gets the same token file. Its `node.env` has `-listen`
+and `-cluster-token-file`, and no `-join`.
+
+`-listen 0.0.0.0:8080` opens labview on each network of the node.
+Limit port 8080 to the cluster network with a security group.
+
+A node needs KVM. A VM node needs a flavor with nested virtualization.
+A node with no KVM joins, and it shows as not ready.
+
+A physical node has no user data. Write the two files by hand, and
+restart `labview.service`.

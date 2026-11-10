@@ -31,6 +31,7 @@ const (
 	TypeAttach       = "attach"
 	TypeDetach       = "detach"
 	TypePeerFail     = "peer-fail"
+	TypeJoin         = "join"
 	TypeRunStarted   = "run.started"
 	TypeRunFinished  = "run.finished"
 	TypeStepStarted  = "step.started"
@@ -203,6 +204,16 @@ func (b *Bus) NodeUp(machines int, fields map[string]any) {
 	}
 	fields["machines"] = machines
 	b.Emit(Event{Kind: KindNode, Type: TypeUp, Fields: fields})
+}
+
+// NodeJoin emits a node that registers with this node.
+func (b *Bus) NodeJoin(name string, kvm bool) {
+	b.Emit(Event{
+		Kind:   KindNode,
+		Type:   TypeJoin,
+		Detail: name,
+		Fields: map[string]any{"node": name, "kvm": kvm},
+	})
 }
 
 // PeerFail emits a peer listing failure.

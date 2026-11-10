@@ -30,8 +30,10 @@ RUN CGO_ENABLED=0 go build -trimpath \
 FROM quay.io/fedora/fedora-bootc:45
 
 # QEMU is the hypervisor. No libvirt: labview talks to sockets, files and
-# the system bus (docs/design/labview.md).
+# the system bus (docs/design/labview.md). cloud-init gives a node its
+# cluster settings at first boot (docs/design/cluster.md section 5).
 RUN dnf -y install \
+	cloud-init \
 	qemu-kvm \
 	qemu-system-x86 \
 	qemu-img \
