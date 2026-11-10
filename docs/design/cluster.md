@@ -9,7 +9,8 @@ document of the console wall, the lease, the serial broker and the HTTP
 surface that already ships. Where the two disagree on scope or deploy,
 this document wins.
 
-Status: slices 1-5 ship. Scenarios and auto-extend remain under
+Status: slices 1-5 ship. Scenarios, join at boot, placement and
+metrics remain under
 https://github.com/maglo/qemu-lab-manager/issues/72.
 
 ---
@@ -22,10 +23,10 @@ In:
   destroy.
 - A Fedora bootc image on GHCR. The image is the node OS.
 - A cluster of nodes, one wall, one API.
-- Nodes that join and leave. Capacity that extends when the lab needs
-  more hosts.
+- Nodes that join and leave. A new machine goes to a node that has
+  capacity.
 - Observation: live framebuffer, serial, machine details.
-- Telemetry: metrics and events about nodes, machines and scenarios.
+- Telemetry: events as NDJSON, numbers as Prometheus metrics.
 - Scenario orchestration: declare machines, run steps, assert, tear
   down.
 
@@ -34,6 +35,9 @@ Out:
 - Ansible as the deployer of this lab or of its VMs.
 - A privileged container on a foreign host OS.
 - A user database inside labview. Identity still arrives from a proxy.
+- Creation of a host. An operator or other tooling creates the VM or
+  installs the physical node. labview uses the nodes that join.
+- More than a small team needs. This is a lab test tool.
 
 ---
 
@@ -43,8 +47,8 @@ The console wall is useful only when machines exist. Today something
 else creates them. That split forces two tools, two inventories and a
 deploy path the lab does not control.
 
-The API owns the machine. The image owns the host. The cluster owns
-capacity. A scenario owns a run. One product.
+The API owns the machine. The image owns the host. The cluster places
+machines on the nodes it has. A scenario owns a run. One product.
 
 ---
 
@@ -182,11 +186,20 @@ One node runs alone and is a valid lab. Several nodes join one cluster.
 - One node serves the wall and the API that clients use. Other nodes
   are peers it reaches over the same section-5 API, on a private
   network the image configures.
-- Auto-extend adds a node when the scheduler cannot place a machine.
-  How a node is provisioned (cloud API, bare metal, nested VM) is an
-  open decision on issue #72.
 
-### Join (this slice)
+### Nodes
+
+A node is a cloud VM, for example in OpenStack, or a physical host.
+labview does not create a node.
+
+A node needs KVM. A VM node needs a flavor with nested
+virtualization. A node without `/dev/kvm` shows as not ready, and it
+gets no machines. QEMU without KVM is too slow for a lab.
+
+cloud-init configures a node at first boot. The user data gives the
+node the URL of the API node and the cluster token.
+
+### Join with the peer flag
 
 `-peer name=url` names each peer (repeatable). Peer machines appear on
 `GET /api/machines` as `peer:local-id`. Machine-scoped HTTP forwards to
@@ -194,12 +207,42 @@ the peer that owns the machine. Create stays local: a client that wants
 a machine on a peer calls that peer, or a later scheduler does.
 
 `-cluster-token` is sent as `X-Labview-Cluster-Token` on peer calls.
-Empty sends nothing. Enforcing the token on inbound requests is a
-later hardening slice.
+Empty sends nothing. The join at boot slice checks the token on
+inbound requests.
 
 Websocket attach to a remote machine answers 501 until forwarding
 lands. A peer that does not answer is named in `peerFailures` on the
 machines list; the rest of the wall still loads.
+
+### Join at boot
+
+Issue: https://github.com/maglo/qemu-lab-manager/issues/93.
+
+A node registers with the API node when it boots, and again at an
+interval. The API node does not restart. The API node drops a node
+that stops its registration. The API node rejects a registration or a
+peer call that has a wrong cluster token.
+
+`-peer` stays for a fixed set of nodes.
+
+### Placement
+
+Issue: https://github.com/maglo/qemu-lab-manager/issues/94.
+
+Each node reports its free memory, CPU count and free disk. `POST
+/api/machines` on the API node picks a ready node that fits the create
+document, and forwards the create. A `node` field in the document
+names the node instead. When no node fits, create fails and names the
+resource that is short. The operator then adds a node.
+
+### Websocket forward
+
+Issue: https://github.com/maglo/qemu-lab-manager/issues/96.
+
+The API node forwards console and serial websockets to the node that
+owns the machine. The lease stays on that node.
+
+### Failure
 
 Failure rule: a node that disappears keeps its machines marked
 unreachable. The control plane does not silently recreate them on
@@ -208,6 +251,11 @@ another node. A scenario that needs replace-on-failure says so.
 ---
 
 ## 6. Telemetry
+
+Telemetry has two forms. Events leave as NDJSON. Numbers leave as
+Prometheus metrics. There is no OTLP export.
+
+### Events
 
 Every node emits:
 
@@ -223,8 +271,20 @@ events are one JSON object per line on the unit's stdout. Activity
 actions feed the machine events. A peer listing failure emits
 `peer-fail` once per distinct error text.
 
-OTLP or a remote sink is a later slice if a lab asks for it. Scenario
-events land with the scenario runner.
+Scenario events land with the scenario runner.
+
+### Metrics
+
+Issue: https://github.com/maglo/qemu-lab-manager/issues/95.
+
+`GET /metrics` serves the Prometheus text format. It holds gauges for
+the node (free memory, CPU count, free disk, machine count, peer
+count, KVM) and for each machine (running, lease held). It holds
+counters for lease grants, lease denials and peer failures. The
+capacity gauges are the numbers that placement uses.
+
+Each node serves its own metrics, and Prometheus scrapes each node.
+The image ships no Prometheus.
 
 Live consoles and serial are observation, not telemetry. They stay on
 their websockets.
@@ -279,17 +339,29 @@ Work lands in this order. Each slice has its own issue under #72.
 5. Telemetry stream. Done.
 6. Scenario object and runner. Document locked (#82). Runner v1
    (https://github.com/maglo/qemu-lab-manager/issues/88).
-7. Auto-extend of capacity.
+7. Join at boot with cloud-init and a checked cluster token
+   (https://github.com/maglo/qemu-lab-manager/issues/93).
+8. Placement of a new machine
+   (https://github.com/maglo/qemu-lab-manager/issues/94).
+9. Prometheus metrics
+   (https://github.com/maglo/qemu-lab-manager/issues/95).
+10. Websocket forward to peer machines
+    (https://github.com/maglo/qemu-lab-manager/issues/96).
 
 ---
 
-## 10. Open decisions
+## 10. Decisions
 
-Tracked on https://github.com/maglo/qemu-lab-manager/issues/72:
+No decision is open.
 
-1. How a node auto-extends.
-2. Telemetry sink beyond JSON/stdout.
-
-Locked: registry is GHCR, base is Fedora bootc, binary name is
-`labview`. Scenario document format is locked in
-[`scenarios.md`](scenarios.md).
+| Topic | Decision |
+|---|---|
+| Registry | GHCR, public. |
+| Base image | Fedora bootc. |
+| Binary name | `labview`. |
+| Scenario format | See [`scenarios.md`](scenarios.md). |
+| Nodes | Cloud VMs or physical hosts. cloud-init configures them. |
+| KVM | A node needs KVM. A VM node needs nested virtualization. |
+| Capacity | Join and placement. labview does not create a host. |
+| Telemetry | NDJSON events and Prometheus metrics. No OTLP. |
+| Size | A small team. |

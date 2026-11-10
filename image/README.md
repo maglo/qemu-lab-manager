@@ -56,4 +56,5 @@ See `docs/design/cluster.md` section 4.
 
 ## What this image does not do yet
 
-- Auto-extend capacity.
+- Read cloud-init user data.
+- Join a cluster at boot.

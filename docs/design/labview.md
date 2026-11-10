@@ -696,8 +696,8 @@ runner is another, and neither gets a privileged path.
 
 One labview per node, with local host access for the machines it owns.
 `-peer name=url` joins other nodes over the same §5 API.
-[`cluster.md`](cluster.md) section 5 names the wire form, scheduling
-and auto-extend.
+[`cluster.md`](cluster.md) section 5 names the wire form, join at
+boot and placement.
 
 A single node with no peers is a valid lab. It does not pay for
 cluster features it does not use.
