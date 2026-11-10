@@ -70,6 +70,21 @@ type Config struct {
 	// ClusterToken is sent to peers as X-Labview-Cluster-Token. Empty
 	// sends nothing.
 	ClusterToken string
+	// ClusterTokenFile holds the cluster token. A file keeps the token
+	// out of the command line of the process.
+	ClusterTokenFile string
+
+	// JoinURL is the API node that this node registers with. Empty
+	// means no registration.
+	JoinURL string
+	// NodeName is the name this node registers with.
+	NodeName string
+	// AdvertiseURL is where the API node reaches this node.
+	AdvertiseURL string
+	JoinInterval time.Duration
+	// NodeTTL is how long this node keeps a registered node that does
+	// not renew.
+	NodeTTL time.Duration
 
 	// IdentityHeader carries the identity the proxy asserted. It names the
 	// lease holder in the UI and says who attached to what in the log. It
@@ -126,6 +141,8 @@ func Default() Config {
 		// MachinesDir is empty by default: create/destroy are opt-in.
 		// The bootc node image passes -machines-dir explicitly.
 		MachinesDir:     "",
+		JoinInterval:    peer.DefaultJoinInterval,
+		NodeTTL:         peer.DefaultNodeTTL,
 		IdentityHeader:  "X-Forwarded-User",
 		DefaultIdentity: "unidentified",
 
@@ -180,7 +197,19 @@ func Bind(fs *flag.FlagSet, c *Config) {
 		return nil
 	})
 	fs.StringVar(&c.ClusterToken, "cluster-token", c.ClusterToken,
-		"token sent to peer labviews; empty sends none")
+		"token sent to peer labviews, and checked on calls from them; empty sends none")
+	fs.StringVar(&c.ClusterTokenFile, "cluster-token-file", c.ClusterTokenFile,
+		"file that holds the cluster token; use it in place of -cluster-token")
+	fs.StringVar(&c.JoinURL, "join", c.JoinURL,
+		"URL of the API node to register with; empty registers nowhere")
+	fs.StringVar(&c.NodeName, "node-name", c.NodeName,
+		"name this node registers with")
+	fs.StringVar(&c.AdvertiseURL, "advertise-url", c.AdvertiseURL,
+		"URL where the API node reaches this node")
+	fs.DurationVar(&c.JoinInterval, "join-interval", c.JoinInterval,
+		"how often this node renews its registration")
+	fs.DurationVar(&c.NodeTTL, "node-ttl", c.NodeTTL,
+		"how long a registered node stays with no renewal")
 
 	fs.StringVar(&c.IdentityHeader, "identity-header", c.IdentityHeader,
 		"request header carrying the identity asserted by the proxy")
@@ -277,6 +306,26 @@ func (c Config) Validate() error {
 			errs = append(errs, fmt.Errorf("peer name %q is repeated", p.Name))
 		}
 		seenPeer[p.Name] = struct{}{}
+	}
+	if c.ClusterToken != "" && c.ClusterTokenFile != "" {
+		errs = append(errs, errors.New("cluster-token and cluster-token-file are both set; use one"))
+	}
+	if c.JoinURL != "" {
+		if c.ClusterToken == "" && c.ClusterTokenFile == "" {
+			errs = append(errs, errors.New("join needs a cluster token"))
+		}
+		if _, err := peer.ParseFlag(c.NodeName + "=" + c.AdvertiseURL); err != nil {
+			errs = append(errs, fmt.Errorf("join needs node-name and advertise-url: %w", err))
+		}
+		if _, err := peer.ParseFlag("api=" + c.JoinURL); err != nil {
+			errs = append(errs, fmt.Errorf("join: %w", err))
+		}
+		if c.JoinInterval <= 0 {
+			errs = append(errs, errors.New("join interval must be positive"))
+		}
+	}
+	if c.NodeTTL <= 0 {
+		errs = append(errs, errors.New("node TTL must be positive"))
 	}
 	return errors.Join(errs...)
 }

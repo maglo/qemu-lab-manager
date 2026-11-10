@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -61,6 +62,17 @@ func run(args []string) error {
 	}
 	if err := cfg.Validate(); err != nil {
 		return err
+	}
+
+	if cfg.ClusterTokenFile != "" {
+		raw, err := os.ReadFile(cfg.ClusterTokenFile)
+		if err != nil {
+			return fmt.Errorf("cluster-token-file: %w", err)
+		}
+		cfg.ClusterToken = strings.TrimSpace(string(raw))
+		if cfg.ClusterToken == "" {
+			return fmt.Errorf("cluster-token-file %s is empty", cfg.ClusterTokenFile)
+		}
 	}
 
 	level := slog.LevelInfo
@@ -145,6 +157,7 @@ func run(args []string) error {
 		Peers:          cfg.Peers,
 		IdentityHeader: cfg.IdentityHeader,
 		ClusterToken:   cfg.ClusterToken,
+		NodeTTL:        cfg.NodeTTL,
 	})
 	if err != nil {
 		return fmt.Errorf("peers: %w", err)
@@ -196,6 +209,20 @@ func run(args []string) error {
 
 	go watcher.Run(ctx)
 	go leases.Run(ctx, cfg.LeaseSweep)
+	if cfg.JoinURL != "" {
+		joiner := &peer.Joiner{
+			APIURL: strings.TrimRight(cfg.JoinURL, "/"),
+			Token:  cfg.ClusterToken,
+			Self: peer.Registration{
+				Name: cfg.NodeName,
+				URL:  cfg.AdvertiseURL,
+				KVM:  peer.KVMPresent(),
+			},
+			Interval: cfg.JoinInterval,
+			Log:      log,
+		}
+		go joiner.Run(ctx)
+	}
 
 	// Brokers start eagerly, at process start, so a VM that reboots while
 	// nobody is watching is still captured (design section 11).
