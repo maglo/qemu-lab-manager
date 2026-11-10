@@ -446,8 +446,34 @@ func (r *Runner) runStep(ctx context.Context, run *Run, step Step) error {
 		return r.stepEvidence(ctx, run, step.Evidence)
 	case step.HTTPGet != nil:
 		return r.stepHTTPGet(ctx, step.HTTPGet)
+	case step.Hotplug != nil:
+		return r.stepHotplug(ctx, run, step.Hotplug)
 	default:
 		return errors.New("empty step")
+	}
+}
+
+func (r *Runner) stepHotplug(ctx context.Context, run *Run, step *HotplugStep) error {
+	m, err := r.machine(step.Machine)
+	if err != nil {
+		return err
+	}
+	if !m.HasControl() {
+		return fmt.Errorf("machine %q has no control socket", m.ID)
+	}
+	if !r.deps.Leases.CanWrite(m.ID, run.LeaseAs) {
+		return fmt.Errorf("no write lease on %s", m.ID)
+	}
+	t := qmp.Target{ID: m.ID, Network: m.ControlNetwork(), Address: m.Control}
+	switch step.Op {
+	case "add":
+		return r.deps.Control.Hotplug(ctx, t, qmp.HotplugSpec{
+			ID: step.ID, Kind: step.Kind, Image: step.Image, Reader: step.Reader,
+		})
+	case "remove":
+		return r.deps.Control.DeviceDel(ctx, t, step.ID)
+	default:
+		return fmt.Errorf("hotplug.op %q must be add or remove", step.Op)
 	}
 }
 

@@ -145,9 +145,21 @@ owns.
 | `assertScreen` | Capture a screenshot; optional future image assert | Screenshot API |
 | `evidence` | Copy screenshot and serial capture into the run bundle | — |
 | `httpGet` | GET a guest URL the host can reach; assert status | Guest network |
+| `hotplug` | Add or remove a live USB / CCID device | Write lease, QMP |
 
-Later steps (not v1): `hotplug` (USB, smart card), guest filesystem
-copy, firmware UI helpers. Those land when LCM exposes the verbs.
+Later steps: guest filesystem copy, firmware UI helpers.
+
+### Hotplug
+
+```yaml
+- hotplug: { machine: target-a, op: add, id: stick0, kind: usb-storage, image: /path/stick.img }
+- hotplug: { machine: target-a, op: add, id: reader0, kind: usb-ccid }
+- hotplug: { machine: target-a, op: add, id: card0, kind: ccid-card, reader: reader0 }
+- hotplug: { machine: target-a, op: remove, id: stick0 }
+```
+
+`kind` matches `POST /api/machines/{id}/devices`. The runner calls
+the same QMP path the HTTP handler uses. It does not invent QEMU flags.
 
 ### Matching
 
@@ -266,4 +278,7 @@ Still open:
 
 1. Published JSON Schema file beside the docs.
 2. Whether `labviewctl` is a subcommand or a second binary.
-3. Default `-scenarios-dir` on the node image.
+
+Nodes stay cattle: no default scenario content or `-scenarios-dir` on
+the node image. Operators pass `-scenarios-dir` when a node should keep
+evidence on disk.

@@ -2,11 +2,12 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/maglo/qemu-lab-manager/labview/internal/activity"
+	"github.com/maglo/qemu-lab-manager/labview/internal/qmp"
 )
 
 // deviceRequest is POST /api/machines/{id}/devices.
@@ -47,8 +48,10 @@ func (s *Server) handleAddDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.hotplugDevice(r, m.ID, req); err != nil {
-		if isBadHotplug(err) {
+	if err := s.control.Hotplug(r.Context(), target(m), qmp.HotplugSpec{
+		ID: req.ID, Kind: req.Kind, Image: req.Image, Reader: req.Reader,
+	}); err != nil {
+		if errors.Is(err, qmp.ErrBadHotplug) {
 			writeError(w, http.StatusBadRequest, "%s", err.Error())
 			return
 		}
@@ -90,46 +93,6 @@ func (s *Server) handleRemoveDevice(w http.ResponseWriter, r *http.Request) {
 		Machine: m.ID, User: user, Action: "device-del", Detail: devID,
 	})
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "id": devID})
-}
-
-func (s *Server) hotplugDevice(r *http.Request, machineID string, req deviceRequest) error {
-	m, ok := s.inventory.Current().Get(machineID)
-	if !ok {
-		return badHotplug("no machine")
-	}
-	tgt := target(m)
-	switch req.Kind {
-	case "usb-tablet":
-		return s.control.DeviceAdd(r.Context(), tgt, "usb-tablet", map[string]any{"id": req.ID})
-	case "usb-storage":
-		if req.Image == "" {
-			return badHotplug("usb-storage needs image")
-		}
-		return s.control.HotplugUSBStorage(r.Context(), tgt, req.ID, req.Image)
-	case "usb-ccid":
-		return s.control.DeviceAdd(r.Context(), tgt, "usb-ccid", map[string]any{"id": req.ID})
-	case "ccid-card":
-		if req.Reader == "" {
-			return badHotplug("ccid-card needs reader")
-		}
-		return s.control.DeviceAdd(r.Context(), tgt, "ccid-card-emulated", map[string]any{
-			"id":  req.ID,
-			"bus": req.Reader + ".0",
-		})
-	default:
-		return badHotplug(fmt.Sprintf("kind %q is not usb-tablet, usb-storage, usb-ccid or ccid-card", req.Kind))
-	}
-}
-
-type badHotplugError string
-
-func (e badHotplugError) Error() string { return string(e) }
-
-func badHotplug(msg string) error { return badHotplugError(msg) }
-
-func isBadHotplug(err error) bool {
-	_, ok := err.(badHotplugError)
-	return ok
 }
 
 func (s *Server) writeLeaseDenied(w http.ResponseWriter, machine, user, detail string) {
