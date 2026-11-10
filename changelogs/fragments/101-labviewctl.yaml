@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - "labviewctl - add a thin HTTP client for scenario run, get and
+    evidence (https://github.com/maglo/qemu-lab-manager/issues/101)."

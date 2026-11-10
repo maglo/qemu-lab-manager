@@ -1,6 +1,7 @@
 # qemu-lab-manager
 
-The tooling for a QEMU lab. It builds one Go binary, `labview`.
+The tooling for a QEMU lab. It builds the Go binaries `labview` and
+`labviewctl`.
 
 ## labview
 
@@ -30,6 +31,7 @@ Nothing but a Go toolchain. The browser application, noVNC and xterm are all
 embedded in the binary.
 
     go build -o labview ./cmd/labview
+    go build -o labviewctl ./cmd/labviewctl
     go test -race ./...
 
 A second layer of checks drives labview in a real browser against a fake lab:
