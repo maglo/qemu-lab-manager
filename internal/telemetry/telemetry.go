@@ -92,22 +92,20 @@ func (b *Bus) Emit(ev Event) {
 		copy(out, b.ring[len(b.ring)-b.capacity:])
 		b.ring = out
 	}
-	subs := make([]chan Event, 0, len(b.subs))
+	// The sends stay under the lock, so Unsubscribe cannot close a channel
+	// that a send is about to use.
 	for ch := range b.subs {
-		subs = append(subs, ch)
+		select {
+		case ch <- ev:
+		default:
+			// Slow subscriber: drop rather than block the lab.
+		}
 	}
 	b.mu.Unlock()
 
 	if b.stdout != nil {
 		enc := json.NewEncoder(b.stdout)
 		_ = enc.Encode(ev)
-	}
-	for _, ch := range subs {
-		select {
-		case ch <- ev:
-		default:
-			// Slow subscriber: drop rather than block the lab.
-		}
 	}
 }
 

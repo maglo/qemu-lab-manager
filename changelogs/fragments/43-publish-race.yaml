@@ -3,3 +3,6 @@ bugfixes:
   - "lease - the manager does not send an event on a channel that a
     closing websocket closes at the same time
     (https://github.com/maglo/qemu-lab-manager/issues/43)."
+  - "telemetry - the bus does not send an event on a channel that
+    a leaving subscriber closes at the same time
+    (https://github.com/maglo/qemu-lab-manager/issues/90)."
