@@ -88,3 +88,26 @@ func TestNodeUpAndPeerFail(t *testing.T) {
 		t.Fatalf("peer = %+v", snap[1])
 	}
 }
+
+// A subscriber that leaves while another goroutine emits is a client that
+// closes the telemetry stream on a busy node.
+func TestUnsubscribeDuringEmit(t *testing.T) {
+	b := New(Options{})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 2000; i++ {
+			b.Emit(Event{Kind: "test"})
+		}
+	}()
+
+	for {
+		select {
+		case <-done:
+			return
+		default:
+		}
+		b.Unsubscribe(b.Subscribe(1))
+	}
+}
