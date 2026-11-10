@@ -291,6 +291,31 @@ func TestSubscribePublishesTransitions(t *testing.T) {
 	}
 }
 
+// A subscriber that stops while another goroutine publishes is the close of
+// one websocket during the release of another.
+func TestStopDuringPublish(t *testing.T) {
+	m := newTestManager(newClock())
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 2000; i++ {
+			m.Acquire("vm1", "alice")
+			m.Release("vm1", "alice")
+		}
+	}()
+
+	for {
+		select {
+		case <-done:
+			return
+		default:
+		}
+		_, stop := m.Subscribe()
+		stop()
+	}
+}
+
 func TestAcquireRequiresIdentity(t *testing.T) {
 	m := newTestManager(newClock())
 	if _, err := m.Acquire("vm1", ""); err == nil {
