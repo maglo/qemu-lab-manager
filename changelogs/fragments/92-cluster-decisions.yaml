@@ -1,0 +1,4 @@
+---
+trivial:
+  - "docs - lock the node, capacity and telemetry decisions of the
+    lab cluster (https://github.com/maglo/qemu-lab-manager/issues/92)."

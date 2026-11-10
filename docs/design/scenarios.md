@@ -34,7 +34,7 @@ Out:
 - Server-side expect on interactive serial attach. Matching lives only
   in the scenario runner.
 - OTLP.
-- Auto-extend of capacity.
+- Creation of a host.
 
 ---
 
