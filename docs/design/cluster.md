@@ -9,8 +9,7 @@ document of the console wall, the lease, the serial broker and the HTTP
 surface that already ships. Where the two disagree on scope or deploy,
 this document wins.
 
-Status: slices 1-8 ship. Metrics and the websocket forward remain
-under
+Status: slices 1-9 ship. The websocket forward remains under
 https://github.com/maglo/qemu-lab-manager/issues/72.
 
 ---
@@ -349,16 +348,38 @@ Scenario events land with the scenario runner.
 
 ### Metrics
 
-Issue: https://github.com/maglo/qemu-lab-manager/issues/95.
+`GET /metrics` serves the Prometheus text format.
 
-`GET /metrics` serves the Prometheus text format. It holds gauges for
-the node (free memory, CPU count, free disk, machine count, peer
-count, KVM) and for each machine (running, lease held). It holds
-counters for lease grants, lease denials and peer failures. The
-capacity gauges are the numbers that placement uses.
+| Metric | Type | Meaning |
+|---|---|---|
+| `labview_build_info{version}` | gauge | The version of labview. The value is 1. |
+| `labview_node_kvm` | gauge | 1 when the node has KVM. |
+| `labview_node_lifecycle` | gauge | 1 when the node can create a machine. |
+| `labview_node_cpus` | gauge | The CPU count of the node. |
+| `labview_node_memory_free_bytes` | gauge | The memory that a new machine can use. |
+| `labview_node_disk_free_bytes` | gauge | The free space under the machines directory. |
+| `labview_node_peers` | gauge | The peers of this node. |
+| `labview_node_machines` | gauge | The machines in the inventory of this node. |
+| `labview_machine_live{machine}` | gauge | 1 when the machine runs. |
+| `labview_machine_lease_held{machine}` | gauge | 1 when a user holds the write lease. |
+| `labview_lease_grants_total` | counter | The write leases that this node gave. |
+| `labview_lease_denials_total` | counter | The requests refused because the user did not hold the lease. |
+| `labview_peer_failures_total` | counter | The machine list calls to a peer that failed. |
+
+The node gauges are the numbers of `GET /api/cluster/capacity`, so a
+graph shows what placement sees. `labview_node_disk_free_bytes` is 0
+on a node that cannot create a machine.
+
+A counter starts at 0 when labview starts. `labview_machine_live` is
+the `live` field of `GET /api/machines`. No metric has a user name as
+a label, so the number of series follows the number of machines.
 
 Each node serves its own metrics, and Prometheus scrapes each node.
-The image ships no Prometheus.
+The API node does not collect the metrics of its peers. The image
+ships no Prometheus.
+
+labview writes the text format itself. It has few metrics, and the
+format is small, so it takes no client library.
 
 Live consoles and serial are observation, not telemetry. They stay on
 their websockets.
@@ -416,8 +437,7 @@ Work lands in this order. Each slice has its own issue under #72.
    (https://github.com/maglo/qemu-lab-manager/issues/88).
 7. Join at boot with cloud-init and a checked cluster token. Done.
 8. Placement of a new machine. Done.
-9. Prometheus metrics
-   (https://github.com/maglo/qemu-lab-manager/issues/95).
+9. Prometheus metrics. Done.
 10. Websocket forward to peer machines
     (https://github.com/maglo/qemu-lab-manager/issues/96).
 

@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - "labview - ``GET /metrics`` serves gauges for the node and its
+    machines, and counters for leases and peer failures, in the
+    Prometheus text format
+    (https://github.com/maglo/qemu-lab-manager/issues/95)."

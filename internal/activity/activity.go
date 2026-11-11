@@ -56,6 +56,9 @@ type Log struct {
 	mu     sync.Mutex
 	byID   map[string][]Event
 	recent []Event
+	// counts is how many events each action has since the start. The
+	// history is bounded, and a counter must not go down.
+	counts map[string]uint64
 }
 
 // New returns an activity log.
@@ -66,7 +69,12 @@ func New(capacity int, log *slog.Logger) *Log {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Log{capacity: capacity, log: log, byID: make(map[string][]Event)}
+	return &Log{
+		capacity: capacity,
+		log:      log,
+		byID:     make(map[string][]Event),
+		counts:   make(map[string]uint64),
+	}
 }
 
 // SetObserver installs a fan-out for Record. Nil clears it.
@@ -79,6 +87,16 @@ func (l *Log) SetObserver(o Observer) {
 	l.mu.Unlock()
 }
 
+// Count is how many events of an action the log recorded since the start.
+func (l *Log) Count(action string) uint64 {
+	if l == nil {
+		return 0
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.counts[action]
+}
+
 // Record appends an event and mirrors it to the structured log.
 func (l *Log) Record(ev Event) {
 	if ev.At.IsZero() {
@@ -88,6 +106,7 @@ func (l *Log) Record(ev Event) {
 	l.mu.Lock()
 	l.byID[ev.Machine] = appendBounded(l.byID[ev.Machine], ev, l.capacity)
 	l.recent = appendBounded(l.recent, ev, l.capacity*2)
+	l.counts[ev.Action]++
 	observe := l.observe
 	l.mu.Unlock()
 

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/maglo/qemu-lab-manager/labview/internal/activity"
 	"github.com/maglo/qemu-lab-manager/labview/internal/config"
@@ -41,6 +42,8 @@ type Server struct {
 	telemetry *telemetry.Bus
 	scenarios *scenario.Runner
 	peerFails *peerFailTracker
+	// peerFailCount is how many list calls to a peer failed.
+	peerFailCount atomic.Uint64
 	// capacity replaces the capacity of this host. Tests set it.
 	capacity func() peer.Capacity
 	log      *slog.Logger
@@ -148,6 +151,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/cluster/capacity", s.handleCapacity)
 	s.mux.HandleFunc("GET /api/config", s.handleConfig)
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
+	s.mux.HandleFunc("GET /metrics", s.handleMetrics)
 
 	// A path under the API surface is never a route of the browser
 	// application, so it answers as the API answers rather than falling
