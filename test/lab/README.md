@@ -101,6 +101,10 @@ tails serial output, a tile draws a framebuffer, and a machine opens from the
 wall on its serial line. The switched-off machine is refused with the 503 of
 the peer.
 
+The driver closes the first page before it opens this wall. The fake VNC
+sends frames as fast as a tile asks. Two pages with a live framebuffer are
+too much for a small runner.
+
 ## The proxy is not incidental
 
 It asserts the identity **on the websocket upgrade as well as on ordinary

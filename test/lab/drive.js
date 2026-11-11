@@ -460,6 +460,11 @@ async function tileCount(page, want) {
   // Each machine on this wall is a machine of the peer, so its id is
   // lab:<name>, and each socket goes through this node to the peer
   // (https://github.com/maglo/qemu-lab-manager/issues/96).
+  //
+  // The first page closes first. The fake VNC sends frames as fast as a
+  // tile asks, and two pages with a live framebuffer are too much for a
+  // small runner.
+  await page.close();
   const clusterPage = await ctx.newPage();
   clusterPage.on('console', (m) => { if (m.type() === 'error') recordError(m.text()); });
   clusterPage.on('pageerror', (e) => recordError('pageerror: ' + e.message));
