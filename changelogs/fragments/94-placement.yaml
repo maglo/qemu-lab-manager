@@ -1,0 +1,15 @@
+---
+major_changes:
+  - "cluster - ``POST /api/machines`` on a node that has peers puts the
+    machine on the node with the most free memory that fits it. A
+    ``node`` field names the node
+    (https://github.com/maglo/qemu-lab-manager/issues/94)."
+minor_changes:
+  - "api - ``GET /api/cluster/capacity`` reports the free memory, the
+    CPU count, the free disk and KVM of a node
+    (https://github.com/maglo/qemu-lab-manager/issues/94)."
+breaking_changes:
+  - "cluster - a node that has peers answers 409 to a create when no
+    node has KVM and room for the machine. Put ``node`` in the create
+    document to name a node with no check
+    (https://github.com/maglo/qemu-lab-manager/issues/94)."

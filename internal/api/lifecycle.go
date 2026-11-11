@@ -8,23 +8,45 @@ import (
 
 	"github.com/maglo/qemu-lab-manager/labview/internal/activity"
 	"github.com/maglo/qemu-lab-manager/labview/internal/lifecycle"
+	"github.com/maglo/qemu-lab-manager/labview/internal/peer"
 )
 
 const createBodyLimit = 64 << 10
 const patchBodyLimit = 64 << 10
 
 func (s *Server) handleCreateMachine(w http.ResponseWriter, r *http.Request) {
+	var req createRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, createBodyLimit)).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "body is not valid JSON: %s", err.Error())
+		return
+	}
+	spec := req.Spec
+
+	// A create that carries the cluster token comes from the node that
+	// did the placement, so this node is the place. A node with no peer
+	// and no named node is the place also.
+	placed := r.Header.Get(peer.ClusterTokenHeader) != ""
+	if !placed && (req.Node != "" || s.peers.Len() > 0) {
+		if err := spec.Validate(); err != nil {
+			writeError(w, http.StatusBadRequest, "%s", err.Error())
+			return
+		}
+		target, status, problem := s.place(r.Context(), req)
+		if problem != "" {
+			writeError(w, status, "%s", problem)
+			return
+		}
+		if target != nil {
+			s.createOnPeer(w, r, *target, spec)
+			return
+		}
+	}
+
 	if s.life == nil || !s.life.Enabled() {
 		writeError(w, http.StatusNotImplemented, "machine lifecycle is disabled on this labview")
 		return
 	}
 	user := s.identity(r)
-
-	var spec lifecycle.Spec
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, createBodyLimit)).Decode(&spec); err != nil {
-		writeError(w, http.StatusBadRequest, "body is not valid JSON: %s", err.Error())
-		return
-	}
 
 	mach, err := s.life.Create(r.Context(), spec)
 	if err != nil {

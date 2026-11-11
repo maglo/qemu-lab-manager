@@ -41,7 +41,9 @@ type Server struct {
 	telemetry *telemetry.Bus
 	scenarios *scenario.Runner
 	peerFails *peerFailTracker
-	log       *slog.Logger
+	// capacity replaces the capacity of this host. Tests set it.
+	capacity func() peer.Capacity
+	log      *slog.Logger
 
 	mux *http.ServeMux
 	ui  http.Handler
@@ -143,6 +145,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/scenarios/runs/{id}/evidence/{name}", s.handleScenarioEvidence)
 	s.mux.HandleFunc("GET /api/cluster/nodes", s.handleNodes)
 	s.mux.HandleFunc("POST /api/cluster/nodes", s.handleRegisterNode)
+	s.mux.HandleFunc("GET /api/cluster/capacity", s.handleCapacity)
 	s.mux.HandleFunc("GET /api/config", s.handleConfig)
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
 
