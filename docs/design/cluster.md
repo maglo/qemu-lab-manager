@@ -433,8 +433,8 @@ Work lands in this order. Each slice has its own issue under #72.
 3. Machine create and destroy on one node. Done.
 4. Cluster join; one pane across nodes. Done.
 5. Telemetry stream. Done.
-6. Scenario object and runner. Document locked (#82). Runner v1
-   (https://github.com/maglo/qemu-lab-manager/issues/88).
+6. Scenario object and runner. Done (#82 document, #88 runner).
+   Follow-ons: hotplug step (#100, merged), labviewctl (#101).
 7. Join at boot with cloud-init and a checked cluster token. Done.
 8. Placement of a new machine. Done.
 9. Prometheus metrics. Done.
