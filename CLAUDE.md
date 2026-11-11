@@ -4,14 +4,15 @@ Rules for agents and humans who work in this repository.
 
 ## Repository
 
-qemu-lab-manager holds the tooling for the QEMU lab. It builds one Go binary,
-`labview`. The product shape around that binary is a bootc lab cluster;
-[`docs/design/cluster.md`](docs/design/cluster.md) is the document of that
-shape.
+qemu-lab-manager holds the tooling for the QEMU lab. It builds the Go
+binaries `labview` and `labviewctl`. The product shape around labview is a
+bootc lab cluster; [`docs/design/cluster.md`](docs/design/cluster.md) is the
+document of that shape.
 
 | Path | Content | Its document |
 |---|---|---|
 | `cmd/labview` | The main package. | [`labview.md`](docs/design/labview.md) |
+| `cmd/labviewctl` | Thin scenario HTTP client. | [`scenarios.md`](docs/design/scenarios.md) |
 | `internal/` | The packages of the service. | [`labview.md`](docs/design/labview.md) |
 | `internal/web/static` | The browser application. | [`labview.md`](docs/design/labview.md) |
 | `docs/design/` | One document for each component and each process. | |

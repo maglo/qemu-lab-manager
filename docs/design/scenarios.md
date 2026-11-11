@@ -224,22 +224,22 @@ relevant. The payload shape follows the telemetry slice.
 
 ## 9. CLI
 
-A thin client over the same documents. It does not embed QEMU logic.
+`labviewctl` is a second binary. It is a thin HTTP client over the
+same Scenario documents. It does not embed QEMU logic.
 
 ```text
-labviewctl apply -f lab.yaml
-labviewctl run -f scenario.yaml
-labviewctl get run <id>
-labviewctl evidence <id> -o ./out
+labviewctl run -f scenario.json [-base URL] [-wait]
+labviewctl get run <id> [-base URL]
+labviewctl evidence <id> <name> [-base URL] [-o path]
 ```
 
-`labviewctl run` posts JSON to `POST /api/scenarios/runs` and follows
-status. Manual operators and CI use one schema. CI sets
+`run` posts JSON to `POST /api/scenarios/runs`, sets
+`X-Forwarded-User` from `spec.leaseAs`, and waits for a terminal
+status by default. Manual operators and CI use one schema. CI sets
 `leaseAs: harness/<suite>/<run-id>`.
 
-The binary name and whether it is a subcommand of `labview` or a
-second binary land with the implementation. The document interface
-does not depend on that choice.
+The wire format is JSON. YAML in-repo is for humans; convert before
+`run`, or post JSON that tools emit.
 
 ---
 
@@ -277,8 +277,8 @@ telemetry kind/type names (`scenario` + `run.started` and kin),
 Still open:
 
 1. Published JSON Schema file beside the docs.
-2. Whether `labviewctl` is a subcommand or a second binary.
 
-Nodes stay cattle: no default scenario content or `-scenarios-dir` on
-the node image. Operators pass `-scenarios-dir` when a node should keep
-evidence on disk.
+Locked for the CLI: second binary named `labviewctl`, not a
+`labview` subcommand. Nodes stay cattle: no default scenario content
+or `-scenarios-dir` on the node image. Operators pass `-scenarios-dir`
+when a node should keep evidence on disk.
