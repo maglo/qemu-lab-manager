@@ -324,9 +324,10 @@ func (c *Client) ProxyMachine(w http.ResponseWriter, r *http.Request, identity s
 		writeJSONError(w, http.StatusNotFound, "no peer %q", name)
 		return true
 	}
-	if strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
-		writeJSONError(w, http.StatusNotImplemented,
-			"websocket forwarding to peer %q is not available yet", name)
+	upgrade := strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
+	if upgrade && !sameOrigin(r) {
+		writeJSONError(w, http.StatusForbidden,
+			"the origin %q is not the origin of this node", r.Header.Get("Origin"))
 		return true
 	}
 
@@ -352,6 +353,12 @@ func (c *Client) ProxyMachine(w http.ResponseWriter, r *http.Request, identity s
 				req.Header.Set(ClusterTokenHeader, token)
 			}
 			req.Header.Del("Accept-Encoding")
+			if upgrade {
+				// The peer compares the origin with its own host, and
+				// the browser names the host of this node. This node
+				// did the check above, so the peer gets no origin.
+				req.Header.Del("Origin")
+			}
 		},
 		ErrorHandler: func(rw http.ResponseWriter, _ *http.Request, err error) {
 			writeJSONError(rw, http.StatusBadGateway,
@@ -360,6 +367,17 @@ func (c *Client) ProxyMachine(w http.ResponseWriter, r *http.Request, identity s
 	}
 	proxy.ServeHTTP(w, r)
 	return true
+}
+
+// sameOrigin reports if a websocket request comes from a page of this
+// node. A client that is not a browser sends no origin, and it passes.
+func sameOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	u, err := url.Parse(origin)
+	return err == nil && strings.EqualFold(u.Host, r.Host)
 }
 
 func (c *Client) setHeaders(req *http.Request, identity string) {

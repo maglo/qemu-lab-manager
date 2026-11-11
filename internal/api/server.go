@@ -127,8 +127,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PATCH /api/machines/{id}", s.remoteHTTP(s.handlePatchMachine))
 	s.mux.HandleFunc("DELETE /api/machines/{id}", s.remoteHTTP(s.handleDestroyMachine))
 	s.mux.HandleFunc("POST /api/machines/{id}/lease", s.remoteHTTP(s.handleLease))
-	s.mux.HandleFunc("GET /ws/console/{id}", s.handleConsoleWS)
-	s.mux.HandleFunc("GET /ws/serial/{id}", s.handleSerialWS)
+	s.mux.HandleFunc("GET /ws/console/{id}", s.remoteHTTP(s.handleConsoleWS))
+	s.mux.HandleFunc("GET /ws/serial/{id}", s.remoteHTTP(s.handleSerialWS))
 
 	// The tabs of section 8, each also reachable as JSON.
 	s.mux.HandleFunc("POST /api/machines/{id}/power", s.remoteHTTP(s.handlePower))
@@ -229,7 +229,9 @@ func sanitiseIdentity(v string) string {
 }
 
 // remoteHTTP forwards a machine-scoped request to a peer when the path id
-// is composite. Local ids fall through to the wrapped handler.
+// is composite. Local ids fall through to the wrapped handler. A websocket
+// forwards the same way, so the lease and the broker stay on the node that
+// owns the machine.
 func (s *Server) remoteHTTP(local http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if s.peers != nil && s.peers.ProxyMachine(w, r, s.identity(r)) {
@@ -237,18 +239,6 @@ func (s *Server) remoteHTTP(local http.HandlerFunc) http.HandlerFunc {
 		}
 		local(w, r)
 	}
-}
-
-// rejectRemoteWS refuses a websocket for a peer machine until forwarding
-// lands in a later slice.
-func (s *Server) rejectRemoteWS(w http.ResponseWriter, r *http.Request) bool {
-	id := r.PathValue("id")
-	if _, _, ok := peer.SplitID(id); !ok {
-		return false
-	}
-	writeError(w, http.StatusNotImplemented,
-		"websocket forwarding for remote machine %q is not available yet", id)
-	return true
 }
 
 // machine resolves the {id} path value against the live inventory.

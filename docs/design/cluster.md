@@ -9,7 +9,7 @@ document of the console wall, the lease, the serial broker and the HTTP
 surface that already ships. Where the two disagree on scope or deploy,
 this document wins.
 
-Status: slices 1-9 ship. The websocket forward remains under
+Status: slices 1-10 ship. The epic is
 https://github.com/maglo/qemu-lab-manager/issues/72.
 
 ---
@@ -227,8 +227,7 @@ front of the node is the gate for a person. The token keeps the nodes
 of one cluster apart from the nodes of another. It does not hide a
 node from the network.
 
-Websocket attach to a remote machine answers 501 until forwarding
-lands. A peer that does not answer is named in `peerFailures` on the
+A peer that does not answer is named in `peerFailures` on the
 machines list; the rest of the wall still loads.
 
 ### Join at boot
@@ -309,10 +308,24 @@ can accept more machines than it can run at the same time.
 
 ### Websocket forward
 
-Issue: https://github.com/maglo/qemu-lab-manager/issues/96.
+`/ws/console/{id}` and `/ws/serial/{id}` forward to the node that owns
+the machine, as the machine calls do. The API node copies the bytes in
+both directions. It reads no frame. A close on one side closes the
+other side.
 
-The API node forwards console and serial websockets to the node that
-owns the machine. The lease stays on that node.
+The lease, the serial broker and the recording stay on the node that
+owns the machine. The forward carries the identity of the user, so
+that node names the right holder. A close of the socket on the API
+node releases the lease on that node.
+
+A browser sends the origin of the page with a websocket. A node
+refuses an origin that is not its own host. The page comes from the
+API node, so the node that owns the machine does not know its origin.
+The API node does the origin check, and it forwards the socket with
+no origin. A refusal from the peer, such as a machine with no console,
+reaches the browser with its status.
+
+A node that does not answer gives 502.
 
 ### Failure
 
@@ -438,8 +451,7 @@ Work lands in this order. Each slice has its own issue under #72.
 7. Join at boot with cloud-init and a checked cluster token. Done.
 8. Placement of a new machine. Done.
 9. Prometheus metrics. Done.
-10. Websocket forward to peer machines
-    (https://github.com/maglo/qemu-lab-manager/issues/96).
+10. Websocket forward to peer machines. Done.
 
 ---
 

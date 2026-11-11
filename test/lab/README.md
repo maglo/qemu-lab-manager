@@ -80,7 +80,7 @@ It writes a real PNG, of a different colour each time. That is what lets a
 check see a screenshot tile take a new frame instead of keeping the first
 one.
 
-## Two labviews
+## A second labview, with screenshot tiles
 
 `run.sh` starts a second labview on `$SHOT_PORT`, on the same inventory, with
 `-tile-mode=screenshot`. The mode is a flag, so a second process is the only
@@ -89,6 +89,21 @@ way to drive both walls in one run.
 The driver opens that one directly instead of through the proxy, so it is
 unidentified and holds no lease. That is the point: a screenshot is a read,
 and read is free.
+
+## A third labview, with a peer
+
+`run.sh` starts a third labview on `$CLUSTER_PORT`. It has no machine of its
+own, and the first labview is its peer. Each machine on its wall is a machine
+of another node, with the id `lab:<name>`.
+
+The checks on that wall prove the forward to a peer in a browser: a tile
+tails serial output, a tile draws a framebuffer, and a machine opens from the
+wall on its serial line. The switched-off machine is refused with the 503 of
+the peer.
+
+The driver closes the first page before it opens this wall. The fake VNC
+sends frames as fast as a tile asks. Two pages with a live framebuffer are
+too much for a small runner.
 
 ## The proxy is not incidental
 

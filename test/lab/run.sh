@@ -24,6 +24,7 @@ VNC_PORT=15901
 PORT=${PORT:-18080}
 PROXY_PORT=${PROXY_PORT:-18081}
 SHOT_PORT=${SHOT_PORT:-18082}
+CLUSTER_PORT=${CLUSTER_PORT:-18083}
 work=$(mktemp -d)
 export SHOTS_DIR=${SHOTS_DIR:-$work/shots}
 
@@ -40,6 +41,7 @@ cleanup() {
     echo "=== fake vnc log ==="; tail -20 "$work/vnc.log" 2>/dev/null
     echo "=== fake qmp log ==="; tail -20 "$work/qmp.log" 2>/dev/null
     echo "=== screenshot labview log ==="; tail -20 "$work/labview-shots.log" 2>/dev/null
+    echo "=== cluster labview log ==="; tail -20 "$work/labview-cluster.log" 2>/dev/null
   fi
   rm -rf "$LAB_DIR"
   return $code
@@ -91,12 +93,27 @@ echo "== starting labview on 127.0.0.1:$SHOT_PORT with screenshot tiles"
   >"$work/labview-shots.log" 2>&1 &
 pids+=($!)
 
+# A third labview with no machine of its own. The first labview is its
+# peer, so each machine on its wall is a machine of another node.
+echo "== starting labview on 127.0.0.1:$CLUSTER_PORT with the first labview as its peer"
+mkdir -p "$work/inventory-cluster.d"
+"$work/labview" \
+  -listen "127.0.0.1:$CLUSTER_PORT" \
+  -inventory "$work/inventory-cluster.d" \
+  -host-access fake \
+  -recordings-dir "" \
+  -recordings-max-files 0 \
+  -peer "lab=http://127.0.0.1:$PORT" \
+  >"$work/labview-cluster.log" 2>&1 &
+pids+=($!)
+
 echo "== starting the identity-asserting proxy on 127.0.0.1:$PROXY_PORT"
 node "$here/proxy.js" >"$work/proxy.log" 2>&1 &
 pids+=($!)
 
 # Wait for each to answer rather than sleeping and hoping.
-for name in "labview:$PORT" "proxy:$PROXY_PORT" "screenshot labview:$SHOT_PORT"; do
+for name in "labview:$PORT" "proxy:$PROXY_PORT" "screenshot labview:$SHOT_PORT" \
+  "cluster labview:$CLUSTER_PORT"; do
   label=${name%%:*}; port=${name##*:}
   for _ in $(seq 1 40); do
     if curl -fs -o /dev/null "http://127.0.0.1:$port/healthz"; then
@@ -110,7 +127,8 @@ for name in "labview:$PORT" "proxy:$PROXY_PORT" "screenshot labview:$SHOT_PORT";
 done
 
 echo "== driving a browser"
-SHOT_URL="http://127.0.0.1:$SHOT_PORT" node "$here/drive.js"
+SHOT_URL="http://127.0.0.1:$SHOT_PORT" CLUSTER_URL="http://127.0.0.1:$CLUSTER_PORT" \
+  node "$here/drive.js"
 code=$?
 
 echo

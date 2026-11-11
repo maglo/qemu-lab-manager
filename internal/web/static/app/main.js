@@ -63,12 +63,23 @@ function applyRoute() {
     showWall();
     return;
   }
-  const [, id, tab] = hash.match(/^machine\/([^/]+)(?:\/(.+))?$/) || [];
+  const [, rawId, tab] = hash.match(/^machine\/([^/]+)(?:\/(.+))?$/) || [];
+  // navigate encodes the id, because the id of a machine on a peer has a
+  // colon in it.
+  const id = decodeId(rawId);
   if (!id || !state.summaries.has(id)) {
     showWall();
     return;
   }
   openMachine(id, tab);
+}
+
+function decodeId(raw) {
+  try {
+    return raw && decodeURIComponent(raw);
+  } catch {
+    return undefined;
+  }
 }
 
 function navigate(id, tab) {

@@ -4,6 +4,8 @@ const { chromium } = require('playwright');
 const BASE = process.env.LABVIEW_URL || 'http://127.0.0.1:18081';
 // The wall in screenshot mode is a second labview, because the mode is a flag.
 const SHOT_URL = process.env.SHOT_URL || 'http://127.0.0.1:18082';
+// A labview with no machine of its own, and the first labview as its peer.
+const CLUSTER_URL = process.env.CLUSTER_URL || 'http://127.0.0.1:18083';
 const OUT = process.env.SHOTS_DIR || __dirname + '/shots';
 // The fake VNC server's control port, one above the port it serves.
 const VNC_CONTROL_PORT = Number(process.env.VNC_CONTROL_PORT || 15902);
@@ -100,8 +102,9 @@ async function tileCount(page, want) {
   // console reports should fail the run, which is how the CSP breakage was
   // caught.
   const expectedError = (text) =>
-    // The fixture's switched-off machine, refused with a 503.
-    /ws\/console\/offline-box.*(503|Unexpected response code)/.test(text) ||
+    // The fixture's switched-off machine, refused with a 503. The wall of
+    // the cluster node gets the same refusal from its peer, as lab:offline-box.
+    /ws\/console\/(lab%3A)?offline-box.*(503|Unexpected response code)/.test(text) ||
     /Failed when connecting: Connection closed \(code: 1006\)/.test(text) ||
     // Chromium's own WebCodecs bookkeeping, emitted by the screenshot path
     // on newer builds. Nothing in this application uses VideoFrame -- noVNC
@@ -451,6 +454,42 @@ async function tileCount(page, want) {
     'a tile with no capture source says why it has no picture');
   await shotPage.screenshot({ path: `${OUT}/11-screenshot-wall.png` });
   await shotPage.close();
+
+  // --- a machine of another node ---
+  //
+  // Each machine on this wall is a machine of the peer, so its id is
+  // lab:<name>, and each socket goes through this node to the peer
+  // (https://github.com/maglo/qemu-lab-manager/issues/96).
+  //
+  // The first page closes first. The fake VNC sends frames as fast as a
+  // tile asks, and two pages with a live framebuffer are too much for a
+  // small runner.
+  await page.close();
+  const clusterPage = await ctx.newPage();
+  clusterPage.on('console', (m) => { if (m.type() === 'error') recordError(m.text()); });
+  clusterPage.on('pageerror', (e) => recordError('pageerror: ' + e.message));
+  await clusterPage.goto(CLUSTER_URL, { waitUntil: 'networkidle' });
+  const peerTiles = await waitFor(clusterPage, async () =>
+    (await clusterPage.$$('.tile')).length === 4);
+  check(peerTiles, 'the wall of a node shows the machines of its peer');
+
+  const peerTail = await waitFor(clusterPage, async () =>
+    /AlmaLinux|login:|systemd/.test(
+      await clusterPage.textContent('.tile:has-text("el9-serial-only")') || ''));
+  check(peerTail, 'the tile of a peer machine tails its serial output');
+
+  const peerFrame = await waitFor(clusterPage, async () =>
+    (await clusterPage.$$('.tile:has-text("el9-build") canvas')).length >= 1);
+  check(peerFrame, 'the tile of a peer machine draws its framebuffer');
+
+  await clusterPage.click('.tile:has-text("el9-serial-only")');
+  const peerOpen = await waitFor(clusterPage, async () =>
+    /login:/.test(await clusterPage.textContent('#serial-host').catch(() => '') || ''));
+  check(peerOpen, 'a peer machine opens from the wall, on its serial line');
+  check(clusterPage.url().includes('lab%3Ael9-serial-only'),
+    `the address names the peer machine (${clusterPage.url()})`);
+  await clusterPage.screenshot({ path: `${OUT}/12-peer-machine.png` });
+  await clusterPage.close();
 
   console.log(`\n--- console errors (${expected.length} expected, ignored) ---`);
   if (errors.length === 0) console.log('(none unexpected)');

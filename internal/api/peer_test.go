@@ -68,18 +68,3 @@ func TestPeerMachinesJoinTheWall(t *testing.T) {
 		t.Errorf("proxied path = %q", proxiedPath)
 	}
 }
-
-func TestPeerWebsocketRefused(t *testing.T) {
-	h := newHarness(t)
-	client, err := peer.New(peer.Options{
-		Peers: []peer.Peer{{Name: "kvm02", URL: "http://127.0.0.1:1"}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	h.srv.peers = client
-	rec := h.do("GET", "/ws/console/kvm02:remote-one", "alice", nil)
-	if rec.Code != http.StatusNotImplemented {
-		t.Fatalf("status = %d: %s", rec.Code, rec.Body)
-	}
-}
