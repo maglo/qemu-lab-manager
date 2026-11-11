@@ -123,6 +123,12 @@ everything written to it, so a player that seeks backwards without resetting
 shows a later screen under an earlier clock, and every check that only looks
 for the recorded text still passes.
 
+## The count in the top bar
+
+The top bar counts the machines and the machines that are up. The check reads
+the first count against the four machine files. It does not fix the second
+count, because the fake host access decides which machine is up.
+
 ## The console error policy
 
 `drive.js` fails the run on any console error it does not list as expected.

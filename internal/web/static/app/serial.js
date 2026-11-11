@@ -7,6 +7,7 @@
 
 import { ws } from './api.js';
 import { el } from './dom.js';
+import { terminalTheme } from './theme.js';
 
 // SerialView owns one terminal and one websocket.
 export class SerialView {
@@ -23,7 +24,7 @@ export class SerialView {
       scrollback,
       convertEol: false,
       cursorBlink: false,
-      theme: { background: '#000000', foreground: '#d9dde3' },
+      theme: terminalTheme,
     });
     this.term.open(this.element);
 

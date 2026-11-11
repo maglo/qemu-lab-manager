@@ -7,6 +7,7 @@
 
 import { api } from './api.js';
 import { el } from './dom.js';
+import { terminalTheme } from './theme.js';
 
 // A capture of a boot holds minutes where nothing is printed. Replaying those
 // in real time means watching a still screen, so a gap longer than this is
@@ -91,7 +92,7 @@ export class RecordingPlayer {
       scrollback: 1000,
       disableStdin: true,
       cursorBlink: false,
-      theme: { background: '#000000', foreground: '#d9dde3' },
+      theme: terminalTheme,
     });
     this.term.open(this.screen);
     this.play();

@@ -1,0 +1,8 @@
+---
+minor_changes:
+  - "web - the browser application has a new visual design. The top bar
+    shows a count of the machines and of the machines that are up
+    (https://github.com/maglo/qemu-lab-manager/issues/110)."
+  - "web - the serial pane, the serial tile and the recording player use
+    one terminal palette
+    (https://github.com/maglo/qemu-lab-manager/issues/110)."
