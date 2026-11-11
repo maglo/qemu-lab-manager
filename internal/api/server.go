@@ -141,6 +141,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/scenarios/runs/{id}", s.handleScenarioRun)
 	s.mux.HandleFunc("POST /api/scenarios/runs/{id}/cancel", s.handleScenarioRunCancel)
 	s.mux.HandleFunc("GET /api/scenarios/runs/{id}/evidence/{name}", s.handleScenarioEvidence)
+	s.mux.HandleFunc("GET /api/cluster/nodes", s.handleNodes)
+	s.mux.HandleFunc("POST /api/cluster/nodes", s.handleRegisterNode)
 	s.mux.HandleFunc("GET /api/config", s.handleConfig)
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
 
@@ -184,6 +186,9 @@ func (s *Server) handleNoEndpoint(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if !s.checkClusterToken(w, r) {
+		return
+	}
 	s.mux.ServeHTTP(w, r)
 }
 

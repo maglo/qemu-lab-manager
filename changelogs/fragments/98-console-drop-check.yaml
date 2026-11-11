@@ -1,0 +1,5 @@
+---
+trivial:
+  - "test - the browser check for a dropped console records the note
+    in the page, so a slow runner does not miss it
+    (https://github.com/maglo/qemu-lab-manager/issues/98)."

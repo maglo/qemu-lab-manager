@@ -6,18 +6,23 @@
 [Unit]
 Description=labview -- console wall for the QEMU lab
 Documentation=https://github.com/maglo/qemu-lab-manager
-After=network-online.target dbus.service systemd-tmpfiles-setup.service
+# cloud-init writes /etc/labview/node.env before cloud-config.target.
+After=network-online.target dbus.service systemd-tmpfiles-setup.service cloud-config.target
 Wants=network-online.target
 
 [Service]
 Type=exec
+# LABVIEW_ARGS holds the flags of this node, such as -listen and -join.
+# A flag in it replaces the same flag below. image/README.md has an example.
+EnvironmentFile=-/etc/labview/node.env
 ExecStart=/usr/bin/labview \
     -listen 127.0.0.1:8080 \
     -inventory /var/lib/labview/inventory.d \
     -machines-dir /var/lib/labview/machines \
     -recordings-dir /var/lib/labview/recordings \
     -screenshot-dir /var/lib/labview/screenshots \
-    -host-access local
+    -host-access local \
+    $LABVIEW_ARGS
 
 User=labview
 Group=labview

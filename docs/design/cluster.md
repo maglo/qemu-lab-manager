@@ -9,8 +9,8 @@ document of the console wall, the lease, the serial broker and the HTTP
 surface that already ships. Where the two disagree on scope or deploy,
 this document wins.
 
-Status: slices 1-5 ship. Scenarios, join at boot, placement and
-metrics remain under
+Status: slices 1-7 ship. Placement, metrics and the websocket
+forward remain under
 https://github.com/maglo/qemu-lab-manager/issues/72.
 
 ---
@@ -193,11 +193,16 @@ A node is a cloud VM, for example in OpenStack, or a physical host.
 labview does not create a node.
 
 A node needs KVM. A VM node needs a flavor with nested
-virtualization. A node without `/dev/kvm` shows as not ready, and it
-gets no machines. QEMU without KVM is too slow for a lab.
+virtualization. A node without KVM shows as not ready, and it gets no
+machines. QEMU without KVM is too slow for a lab.
 
-cloud-init configures a node at first boot. The user data gives the
-node the URL of the API node and the cluster token.
+A node has KVM when `/dev/kvm`, `/sys/module/kvm_intel` or
+`/sys/module/kvm_amd` exists. The module directories count because the
+labview unit has a private `/dev`.
+
+cloud-init configures a node at first boot. The user data writes
+`/etc/labview/node.env` and the token file.
+[`image/README.md`](../../image/README.md) has an example.
 
 ### Join with the peer flag
 
@@ -206,9 +211,21 @@ node the URL of the API node and the cluster token.
 the peer that owns the machine. Create stays local: a client that wants
 a machine on a peer calls that peer, or a later scheduler does.
 
-`-cluster-token` is sent as `X-Labview-Cluster-Token` on peer calls.
-Empty sends nothing. The join at boot slice checks the token on
-inbound requests.
+### Cluster token
+
+`-cluster-token-file` names a file that holds the cluster token.
+`-cluster-token` gives the token on the command line, where other
+users of the host can read it.
+
+A node sends the token as `X-Labview-Cluster-Token` on each call to
+another node. A node answers 401 to a request that carries a wrong
+token. A node with no token answers 401 to each request that carries
+one.
+
+A request with no token passes. A browser sends none, and the proxy in
+front of the node is the gate for a person. The token keeps the nodes
+of one cluster apart from the nodes of another. It does not hide a
+node from the network.
 
 Websocket attach to a remote machine answers 501 until forwarding
 lands. A peer that does not answer is named in `peerFailures` on the
@@ -216,12 +233,34 @@ machines list; the rest of the wall still loads.
 
 ### Join at boot
 
-Issue: https://github.com/maglo/qemu-lab-manager/issues/93.
+A node registers with the API node when it starts, and again at each
+`-join-interval` (30 seconds). The API node does not restart.
 
-A node registers with the API node when it boots, and again at an
-interval. The API node does not restart. The API node drops a node
-that stops its registration. The API node rejects a registration or a
-peer call that has a wrong cluster token.
+| Flag | On | Meaning |
+|---|---|---|
+| `-join` | node | URL of the API node. |
+| `-node-name` | node | The name of the node. It is the left side of `name:local-id`. |
+| `-advertise-url` | node | Where the API node reaches the node. |
+| `-join-interval` | node | Time between two registrations. |
+| `-node-ttl` | API node | How long a node stays with no registration (90 seconds). |
+
+The node sends `POST /api/cluster/nodes` with its name, its URL and if
+it has KVM. The call needs the cluster token. An API node with no
+token answers 403, so a lab with no token accepts no node.
+
+A registered node is a peer. Its machines appear on the wall, and
+machine calls forward to it, as for a `-peer` node. A node that sends
+no registration for `-node-ttl` leaves the list. A node that fails to
+register tries again at the next interval, so the API node can start
+last.
+
+A registration cannot take the name of a `-peer` node. A registration
+with a known name and a new URL replaces the URL, because a cloud VM
+can come back with a new address. The token is the only check on that.
+
+`GET /api/cluster/nodes` lists the nodes: name, source (`flag` or
+`join`), KVM, ready and the time of the last registration. It shows no
+URL. A `-peer` node does not report KVM, and it shows as ready.
 
 `-peer` stays for a fixed set of nodes.
 
@@ -259,7 +298,8 @@ Prometheus metrics. There is no OTLP export.
 
 Every node emits:
 
-- Node: up (machine count, disk free, version, peer count), peer-fail.
+- Node: up (machine count, disk free, version, peer count), join,
+  peer-fail.
 - Machine: created, destroyed, power, lease, denied, attach, detach.
 - Scenario: run id, step, result (kinds in
   [`scenarios.md`](scenarios.md) section 8).
@@ -323,8 +363,9 @@ Identity still arrives in `X-Forwarded-User` from a proxy in front of
 the API node. It names lease holders and audit events. It is not an
 authorisation table inside labview.
 
-Node-to-node calls use a cluster credential the image provisions at
-join time. Clients do not see it.
+Node-to-node calls carry the cluster token. cloud-init writes the
+token file at first boot. Clients do not see the token. Section 5 says
+what the token does and does not protect.
 
 ---
 
@@ -339,8 +380,7 @@ Work lands in this order. Each slice has its own issue under #72.
 5. Telemetry stream. Done.
 6. Scenario object and runner. Document locked (#82). Runner v1
    (https://github.com/maglo/qemu-lab-manager/issues/88).
-7. Join at boot with cloud-init and a checked cluster token
-   (https://github.com/maglo/qemu-lab-manager/issues/93).
+7. Join at boot with cloud-init and a checked cluster token. Done.
 8. Placement of a new machine
    (https://github.com/maglo/qemu-lab-manager/issues/94).
 9. Prometheus metrics

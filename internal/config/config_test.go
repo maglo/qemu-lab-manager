@@ -95,6 +95,22 @@ func TestValidateCatchesBadCombinations(t *testing.T) {
 		"zero scrollback":        func(c *Config) { c.RingBytes = 0 },
 		"zero screenshot rate":   func(c *Config) { c.CaptureInterval = 0 },
 		"zero control timeout":   func(c *Config) { c.ControlTimeout = 0 },
+		"zero node TTL":          func(c *Config) { c.NodeTTL = 0 },
+		"token twice": func(c *Config) {
+			c.ClusterToken, c.ClusterTokenFile = "a", "/etc/labview/token"
+		},
+		"join with no token": func(c *Config) {
+			c.JoinURL, c.NodeName, c.AdvertiseURL = "http://api:8080", "n", "http://n:8080"
+		},
+		"join with no name": func(c *Config) {
+			c.JoinURL, c.AdvertiseURL, c.ClusterToken = "http://api:8080", "http://n:8080", "t"
+		},
+		"join with no advertise URL": func(c *Config) {
+			c.JoinURL, c.NodeName, c.ClusterToken = "http://api:8080", "n", "t"
+		},
+		"join with a bad API URL": func(c *Config) {
+			c.JoinURL, c.NodeName, c.AdvertiseURL, c.ClusterToken = "api:8080", "n", "http://n:8080", "t"
+		},
 	}
 	for name, mutate := range cases {
 		c := Default()
@@ -122,5 +138,14 @@ func TestValidateFlagsRetentionWithoutCapture(t *testing.T) {
 	c.TranscriptMaxFiles = 0
 	if err := c.Validate(); err != nil {
 		t.Errorf("disabling capture entirely should be valid: %v", err)
+	}
+}
+
+func TestValidateAcceptsAJoin(t *testing.T) {
+	c := Default()
+	c.JoinURL, c.NodeName, c.AdvertiseURL = "http://api:8080", "node2", "http://10.0.0.2:8080"
+	c.ClusterTokenFile = "/etc/labview/cluster-token"
+	if err := c.Validate(); err != nil {
+		t.Fatalf("a complete join was refused: %v", err)
 	}
 }

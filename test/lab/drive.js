@@ -288,9 +288,20 @@ async function tileCount(page, want) {
   // QEMU looks like from the browser. noVNC removes its canvas when the
   // connection closes, so the canvas coming back is the reconnect
   // (https://github.com/maglo/qemu-lab-manager/issues/54).
+  //
+  // The note stays only until the first retry, about a second. An observer
+  // in the page records it, because a poll from here can miss it on a slow
+  // runner (https://github.com/maglo/qemu-lab-manager/issues/98).
+  await page.evaluate(() => {
+    const host = document.querySelector('#console-host');
+    new MutationObserver(() => {
+      if (/console lost|connecting again/.test(host.textContent || '')) {
+        window.consoleDropNoted = true;
+      }
+    }).observe(host, { childList: true, subtree: true, characterData: true });
+  });
   await dropConsoles();
-  const noted = await waitFor(page, async () =>
-    /console lost|connecting again/.test(await page.textContent('#console-host') || ''));
+  const noted = await waitFor(page, () => page.evaluate(() => window.consoleDropNoted === true));
   check(noted, 'the pane says the console dropped rather than showing a still picture');
   await page.screenshot({ path: `${OUT}/05-console-dropped.png` });
 

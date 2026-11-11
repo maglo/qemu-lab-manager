@@ -3,11 +3,13 @@ package peer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -17,13 +19,28 @@ import (
 // list, so a slow peer must not hold every other tile.
 const DefaultTimeout = 2 * time.Second
 
-// Client reaches the configured peers.
+// DefaultNodeTTL is how long a registration lasts with no renewal.
+const DefaultNodeTTL = 90 * time.Second
+
+// Client reaches the peers. A peer comes from a -peer flag, or it
+// registers at run time (docs/design/cluster.md section 5).
 type Client struct {
 	peers          []Peer
 	byName         map[string]Peer
 	http           *http.Client
 	identityHeader string
 	clusterToken   string
+	ttl            time.Duration
+	now            func() time.Time
+
+	mu     sync.Mutex
+	joined map[string]joinedNode
+}
+
+type joinedNode struct {
+	peer     Peer
+	kvm      bool
+	lastSeen time.Time
 }
 
 // Options configures a Client.
@@ -33,6 +50,10 @@ type Options struct {
 	ClusterToken   string
 	Timeout        time.Duration
 	Transport      http.RoundTripper
+	// NodeTTL is how long a registration lasts with no renewal.
+	NodeTTL time.Duration
+	// Now is the clock. Tests step it.
+	Now func() time.Time
 }
 
 // New returns a Client for the given peers. An empty peer list is valid.
@@ -59,11 +80,22 @@ func New(opts Options) (*Client, error) {
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
+	ttl := opts.NodeTTL
+	if ttl <= 0 {
+		ttl = DefaultNodeTTL
+	}
+	now := opts.Now
+	if now == nil {
+		now = time.Now
+	}
 	return &Client{
 		peers:          append([]Peer(nil), opts.Peers...),
 		byName:         byName,
 		identityHeader: header,
 		clusterToken:   opts.ClusterToken,
+		ttl:            ttl,
+		now:            now,
+		joined:         make(map[string]joinedNode),
 		http: &http.Client{
 			Timeout:   timeout,
 			Transport: transport,
@@ -76,16 +108,17 @@ func (c *Client) Len() int {
 	if c == nil {
 		return 0
 	}
-	return len(c.peers)
+	return len(c.current())
 }
 
-// Names returns the configured peer names in order.
+// Names returns the peer names. Flag peers come first, in flag order.
 func (c *Client) Names() []string {
 	if c == nil {
 		return nil
 	}
-	out := make([]string, len(c.peers))
-	for i, p := range c.peers {
+	peers := c.current()
+	out := make([]string, len(peers))
+	for i, p := range peers {
 		out[i] = p.Name
 	}
 	return out
@@ -96,8 +129,98 @@ func (c *Client) Lookup(name string) (Peer, bool) {
 	if c == nil {
 		return Peer{}, false
 	}
-	p, ok := c.byName[name]
-	return p, ok
+	if p, ok := c.byName[name]; ok {
+		return p, true
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	n, ok := c.joined[name]
+	if !ok || c.expired(n) {
+		return Peer{}, false
+	}
+	return n.peer, true
+}
+
+// current returns the flag peers and the registered nodes that are live.
+func (c *Client) current() []Peer {
+	out := append([]Peer(nil), c.peers...)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	first := len(out)
+	for name, n := range c.joined {
+		if c.expired(n) {
+			delete(c.joined, name)
+			continue
+		}
+		out = append(out, n.peer)
+	}
+	sort.Slice(out[first:], func(i, j int) bool { return out[first+i].Name < out[first+j].Name })
+	return out
+}
+
+func (c *Client) expired(n joinedNode) bool {
+	return c.now().Sub(n.lastSeen) > c.ttl
+}
+
+// ErrFlagPeer says that a registration names a peer of a -peer flag.
+var ErrFlagPeer = errors.New("the name belongs to a -peer flag")
+
+// Register adds a node, or renews it. isNew is true for a node that was
+// not live before the call.
+func (c *Client) Register(r Registration) (isNew bool, err error) {
+	p, err := ParseFlag(r.Name + "=" + r.URL)
+	if err != nil {
+		return false, err
+	}
+	if _, ok := c.byName[p.Name]; ok {
+		return false, fmt.Errorf("node %q: %w", p.Name, ErrFlagPeer)
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	old, ok := c.joined[p.Name]
+	isNew = !ok || c.expired(old)
+	c.joined[p.Name] = joinedNode{peer: p, kvm: r.KVM, lastSeen: c.now()}
+	return isNew, nil
+}
+
+// TTL is how long a registration lasts with no renewal.
+func (c *Client) TTL() time.Duration { return c.ttl }
+
+// Node is one peer as GET /api/cluster/nodes shows it. It holds no URL,
+// because a client never needs the address of a node.
+type Node struct {
+	Name string `json:"name"`
+	// Source is "flag" or "join".
+	Source string `json:"source"`
+	// KVM is nil for a flag peer, which does not report it.
+	KVM *bool `json:"kvm,omitempty"`
+	// Ready is false for a node that reports no KVM.
+	Ready    bool       `json:"ready"`
+	LastSeen *time.Time `json:"lastSeen,omitempty"`
+}
+
+// Nodes lists the flag peers and the registered nodes that are live.
+func (c *Client) Nodes() []Node {
+	if c == nil {
+		return nil
+	}
+	out := make([]Node, 0, len(c.peers))
+	for _, p := range c.peers {
+		out = append(out, Node{Name: p.Name, Source: "flag", Ready: true})
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	first := len(out)
+	for name, n := range c.joined {
+		if c.expired(n) {
+			delete(c.joined, name)
+			continue
+		}
+		kvm, seen := n.kvm, n.lastSeen
+		out = append(out, Node{Name: name, Source: "join", KVM: &kvm, Ready: kvm, LastSeen: &seen})
+	}
+	sort.Slice(out[first:], func(i, j int) bool { return out[first+i].Name < out[first+j].Name })
+	return out
 }
 
 // Failure is one peer that did not answer a list call.
@@ -110,7 +233,11 @@ type Failure struct {
 // machine id to the composite form. A peer that fails is named in failed
 // and does not block the others.
 func (c *Client) ListMachines(ctx context.Context, identity string) (machines []map[string]any, failed []Failure) {
-	if c == nil || len(c.peers) == 0 {
+	if c == nil {
+		return nil, nil
+	}
+	peers := c.current()
+	if len(peers) == 0 {
 		return nil, nil
 	}
 
@@ -119,9 +246,9 @@ func (c *Client) ListMachines(ctx context.Context, identity string) (machines []
 		machines []map[string]any
 		err      error
 	}
-	ch := make(chan result, len(c.peers))
+	ch := make(chan result, len(peers))
 	var wg sync.WaitGroup
-	for _, p := range c.peers {
+	for _, p := range peers {
 		wg.Add(1)
 		go func(p Peer) {
 			defer wg.Done()

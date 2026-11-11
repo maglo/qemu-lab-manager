@@ -1,0 +1,20 @@
+---
+major_changes:
+  - "cluster - a node registers with the API node at start with
+    ``-join``, ``-node-name`` and ``-advertise-url``. The API node needs
+    no restart and no ``-peer`` flag for it
+    (https://github.com/maglo/qemu-lab-manager/issues/93)."
+minor_changes:
+  - "api - ``GET /api/cluster/nodes`` lists the nodes of the cluster
+    and says if each one has KVM
+    (https://github.com/maglo/qemu-lab-manager/issues/93)."
+  - "labview - ``-cluster-token-file`` reads the cluster token from a
+    file (https://github.com/maglo/qemu-lab-manager/issues/93)."
+  - "image - the node image has cloud-init, and the labview unit reads
+    ``LABVIEW_ARGS`` from ``/etc/labview/node.env``
+    (https://github.com/maglo/qemu-lab-manager/issues/93)."
+breaking_changes:
+  - "cluster - a node answers 401 to a request that carries a wrong
+    ``X-Labview-Cluster-Token``. Give each node of a cluster the same
+    token before the upgrade
+    (https://github.com/maglo/qemu-lab-manager/issues/93)."

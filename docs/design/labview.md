@@ -157,6 +157,8 @@ another, and neither gets a privileged path.
 | `GET /api/machines/{id}/screenshot` | One frame of the screen, as PNG |
 | `GET /api/activity` | The activity of every machine |
 | `GET /api/telemetry` | NDJSON events for the node and its machines (cluster.md section 6) |
+| `GET /api/cluster/nodes` | The nodes of the cluster: name, source, KVM, ready (cluster.md section 5) |
+| `POST /api/cluster/nodes` | A node registers, or renews its place; needs the cluster token |
 | `GET /api/config` | The settings the browser application needs |
 | `POST /api/scenarios/runs` | Start a scenario run (scenarios.md) |
 | `GET /api/scenarios/runs` | List recent scenario runs |
@@ -695,9 +697,10 @@ runner is another, and neither gets a privileged path.
 ### What that means for multiple nodes
 
 One labview per node, with local host access for the machines it owns.
-`-peer name=url` joins other nodes over the same §5 API.
-[`cluster.md`](cluster.md) section 5 names the wire form, join at
-boot and placement.
+`-peer name=url` joins other nodes over the same §5 API. `-join`
+registers a node with the API node at start.
+[`cluster.md`](cluster.md) section 5 names the wire form, the cluster
+token, join at boot and placement.
 
 A single node with no peers is a valid lab. It does not pay for
 cluster features it does not use.
