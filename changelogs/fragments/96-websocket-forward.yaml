@@ -1,0 +1,10 @@
+---
+major_changes:
+  - "cluster - the console and the serial line of a machine on a peer
+    open from the wall of the API node. The API node forwards the
+    websocket to the node that owns the machine
+    (https://github.com/maglo/qemu-lab-manager/issues/96)."
+bugfixes:
+  - "web - a machine with a colon in its id opens from the wall. The
+    id of a machine on a peer has a colon
+    (https://github.com/maglo/qemu-lab-manager/issues/96)."
