@@ -154,6 +154,7 @@ func (s *Server) handleMachines(w http.ResponseWriter, r *http.Request) {
 		for _, f := range failed {
 			s.log.Warn("peer machines listing failed", "peer", f.Peer, "error", f.Error)
 			s.peerFails.note(f.Peer, f.Error)
+			s.peerFailCount.Add(1)
 			seenFail[f.Peer] = struct{}{}
 		}
 		for _, p := range s.peers.Names() {

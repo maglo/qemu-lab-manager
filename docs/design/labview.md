@@ -169,6 +169,7 @@ another, and neither gets a privileged path.
 | `GET /ws/console/{id}` | Binary RFB, proxied to the VNC port |
 | `GET /ws/serial/{id}` | Serial stream from the broker, scrollback first |
 | `GET /healthz` | Liveness, and the inventory files that did not load |
+| `GET /metrics` | The numbers of this node in the Prometheus text format (cluster.md section 6) |
 | `GET /` | The browser application |
 
 This table is the list. A reader who wants to know what labview serves reads

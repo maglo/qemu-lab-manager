@@ -126,6 +126,9 @@ type Config struct {
 
 	ActivityCapacity int
 
+	// Version is the build version. main sets it.
+	Version string
+
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 

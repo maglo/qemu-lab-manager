@@ -63,6 +63,7 @@ func run(args []string) error {
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
+	cfg.Version = version
 
 	if cfg.ClusterTokenFile != "" {
 		raw, err := os.ReadFile(cfg.ClusterTokenFile)
