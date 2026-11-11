@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - "scenario - add a hotplug step that calls the same QMP verbs as the
+    device API (https://github.com/maglo/qemu-lab-manager/issues/100)."

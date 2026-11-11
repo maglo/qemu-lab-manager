@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -72,6 +73,60 @@ func TestScenarioRunPowerStep(t *testing.T) {
 	}
 	if conf["scenarios"] != true {
 		t.Fatalf("config.scenarios = %v", conf["scenarios"])
+	}
+}
+
+func TestScenarioRunHotplugStep(t *testing.T) {
+	h := newHarness(t)
+	h.srv.scenarios = scenario.New(scenario.Deps{
+		Inventory: h.srv.inventory,
+		Brokers:   h.brokers,
+		Leases:    h.leases,
+		Hosts:     h.fakeHost,
+		Control:   h.srv.control,
+		Telemetry: h.telem,
+		Log:       h.srv.log,
+	})
+	img := filepath.Join(h.dir, "stick.img")
+	if err := os.WriteFile(img, []byte("x"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	body := json.RawMessage(`{
+		"apiVersion": "labview.dev/v1",
+		"kind": "Scenario",
+		"metadata": {"name": "hotplug-smoke"},
+		"spec": {
+			"leaseAs": "harness/hotplug-smoke/run-hotplug-1",
+			"machines": [{"use": "el9-build"}],
+			"steps": [
+				{"hotplug": {"machine": "el9-build", "op": "add", "id": "stick0", "kind": "usb-storage", "image": "` + img + `"}},
+				{"hotplug": {"machine": "el9-build", "op": "remove", "id": "stick0"}}
+			],
+			"cleanup": "keep"
+		}
+	}`)
+	rec := h.do(http.MethodPost, "/api/scenarios/runs", "harness/hotplug-smoke/run-hotplug-1", body)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	var run scenario.Run
+	for time.Now().Before(deadline) {
+		rec = h.do(http.MethodGet, "/api/scenarios/runs/run-hotplug-1", "", "")
+		if err := json.Unmarshal(rec.Body.Bytes(), &run); err != nil {
+			t.Fatal(err)
+		}
+		if run.Status == scenario.StatusPassed || run.Status == scenario.StatusFailed {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if run.Status != scenario.StatusPassed {
+		t.Fatalf("run status = %s error = %q devices=%v", run.Status, run.Error, h.qemu.devices())
+	}
+	devs := h.qemu.devices()
+	if len(devs) < 2 {
+		t.Fatalf("devices = %#v", devs)
 	}
 }
 

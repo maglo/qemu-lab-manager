@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/maglo/qemu-lab-manager/labview/internal/lifecycle"
+	"github.com/maglo/qemu-lab-manager/labview/internal/qmp"
 )
 
 // APIVersionV1 is the only major this package accepts.
@@ -63,6 +64,7 @@ type Step struct {
 	AssertScreen *AssertScreenStep `json:"assertScreen,omitempty"`
 	Evidence     *EvidenceStep     `json:"evidence,omitempty"`
 	HTTPGet      *HTTPGetStep      `json:"httpGet,omitempty"`
+	Hotplug      *HotplugStep      `json:"hotplug,omitempty"`
 }
 
 // PowerStep starts, stops or restarts a machine.
@@ -142,6 +144,17 @@ type HTTPGetStep struct {
 	Timeout        string `json:"timeout,omitempty"`
 	BodyContains   string `json:"bodyContains,omitempty"`
 	BodyNotContain string `json:"bodyNotContain,omitempty"`
+}
+
+// HotplugStep adds or removes a live device through QMP
+// (same verbs as POST/DELETE /api/machines/{id}/devices).
+type HotplugStep struct {
+	Machine string `json:"machine"`
+	Op      string `json:"op"` // add | remove
+	ID      string `json:"id"`
+	Kind    string `json:"kind,omitempty"`   // add only
+	Image   string `json:"image,omitempty"`  // usb-storage
+	Reader  string `json:"reader,omitempty"` // ccid-card
 }
 
 // ParseDocument decodes and validates a Scenario JSON body.
@@ -275,8 +288,39 @@ func (s Step) validate() error {
 			return errors.New("httpGet.url is required")
 		}
 	}
+	if s.Hotplug != nil {
+		n++
+		if err := validateHotplug(s.Hotplug); err != nil {
+			return err
+		}
+	}
 	if n != 1 {
 		return errors.New("step must set exactly one action")
+	}
+	return nil
+}
+
+func validateHotplug(h *HotplugStep) error {
+	if h.Machine == "" {
+		return errors.New("hotplug.machine is required")
+	}
+	if h.ID == "" {
+		return errors.New("hotplug.id is required")
+	}
+	switch h.Op {
+	case "add":
+		if !qmp.ValidHotplugKind(h.Kind) {
+			return fmt.Errorf("hotplug.kind %q is not usb-tablet, usb-storage, usb-ccid or ccid-card", h.Kind)
+		}
+		if h.Kind == "usb-storage" && h.Image == "" {
+			return errors.New("hotplug.image is required for usb-storage")
+		}
+		if h.Kind == "ccid-card" && h.Reader == "" {
+			return errors.New("hotplug.reader is required for ccid-card")
+		}
+	case "remove":
+	default:
+		return fmt.Errorf("hotplug.op %q must be add or remove", h.Op)
 	}
 	return nil
 }
@@ -334,6 +378,8 @@ func (s Step) Name() string {
 		return "evidence"
 	case s.HTTPGet != nil:
 		return "httpGet"
+	case s.Hotplug != nil:
+		return "hotplug"
 	}
 	return "unknown"
 }

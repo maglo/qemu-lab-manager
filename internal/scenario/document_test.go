@@ -70,6 +70,48 @@ func TestParseDocumentIgnoresXPrefix(t *testing.T) {
 	}
 }
 
+func TestParseDocumentHotplug(t *testing.T) {
+	doc, err := ParseDocument([]byte(`{
+		"apiVersion": "labview.dev/v1",
+		"kind": "Scenario",
+		"metadata": {"name": "usb"},
+		"spec": {
+			"leaseAs": "harness/usb/run-1",
+			"machines": [{"use": "el9-build"}],
+			"steps": [
+				{"hotplug": {"machine": "el9-build", "op": "add", "id": "stick0", "kind": "usb-storage", "image": "/tmp/stick.img"}},
+				{"hotplug": {"machine": "el9-build", "op": "remove", "id": "stick0"}}
+			],
+			"cleanup": "keep"
+		}
+	}`))
+	if err != nil {
+		t.Fatalf("ParseDocument: %v", err)
+	}
+	if doc.Spec.Steps[0].Hotplug.Kind != "usb-storage" {
+		t.Fatalf("kind = %q", doc.Spec.Steps[0].Hotplug.Kind)
+	}
+}
+
+func TestParseDocumentRejectsBadHotplug(t *testing.T) {
+	_, err := ParseDocument([]byte(`{
+		"apiVersion": "labview.dev/v1",
+		"kind": "Scenario",
+		"metadata": {"name": "usb"},
+		"spec": {
+			"leaseAs": "harness/usb/run-1",
+			"machines": [{"use": "el9-build"}],
+			"steps": [
+				{"hotplug": {"machine": "el9-build", "op": "add", "id": "stick0", "kind": "usb-storage"}}
+			],
+			"cleanup": "keep"
+		}
+	}`))
+	if err == nil || !strings.Contains(err.Error(), "image") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestParseDocumentRejectsBadLease(t *testing.T) {
 	_, err := ParseDocument([]byte(`{
 		"apiVersion": "labview.dev/v1",

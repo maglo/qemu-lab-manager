@@ -18,10 +18,11 @@ type fakeQEMU struct {
 	t   *testing.T
 	png []byte
 
-	mu      sync.Mutex
-	refuse  bool
-	keys    [][]string
-	touched bool
+	mu        sync.Mutex
+	refuse    bool
+	keys      [][]string
+	deviceLog []string // "add:driver:id" or "del:id" or "blockdev:id"
+	touched   bool
 }
 
 func newFakeQEMU(t *testing.T) *fakeQEMU {
@@ -40,6 +41,12 @@ func (f *fakeQEMU) sent() [][]string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.keys
+}
+
+func (f *fakeQEMU) devices() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.deviceLog...)
 }
 
 func (f *fakeQEMU) dial(ctx context.Context, network, address string) (net.Conn, error) {
@@ -100,6 +107,25 @@ func (f *fakeQEMU) serve(conn net.Conn) {
 					"class": "GenericError", "desc": err.Error()}})
 				continue
 			}
+			write(map[string]any{"return": map[string]any{}})
+		case "device_add":
+			driver, _ := req.Arguments["driver"].(string)
+			id, _ := req.Arguments["id"].(string)
+			f.mu.Lock()
+			f.deviceLog = append(f.deviceLog, "add:"+driver+":"+id)
+			f.mu.Unlock()
+			write(map[string]any{"return": map[string]any{}})
+		case "device_del":
+			id, _ := req.Arguments["id"].(string)
+			f.mu.Lock()
+			f.deviceLog = append(f.deviceLog, "del:"+id)
+			f.mu.Unlock()
+			write(map[string]any{"return": map[string]any{}})
+		case "blockdev-add":
+			node, _ := req.Arguments["node-name"].(string)
+			f.mu.Lock()
+			f.deviceLog = append(f.deviceLog, "blockdev:"+node)
+			f.mu.Unlock()
 			write(map[string]any{"return": map[string]any{}})
 		default:
 			write(map[string]any{"error": map[string]string{
