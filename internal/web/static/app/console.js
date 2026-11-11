@@ -7,6 +7,7 @@
 import RFB from '/vendor/novnc/core/rfb.js';
 import { api, ws } from './api.js';
 import { el } from './dom.js';
+import { SCREEN } from './theme.js';
 
 // How long to wait before dialling again, and the ceiling it doubles to.
 const RECONNECT_MS = 1000;
@@ -60,7 +61,7 @@ export class RFBRenderer {
     this.rfb.scaleViewport = true;
     this.rfb.clipViewport = false;
     this.rfb.resizeSession = false;
-    this.rfb.background = '#000';
+    this.rfb.background = SCREEN;
     this.rfb.showDotCursor = true;
 
     this.rfb.addEventListener('connect', () => {

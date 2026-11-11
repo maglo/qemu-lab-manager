@@ -124,6 +124,10 @@ async function tileCount(page, want) {
   check(tiles.length === 4, `wall shows 4 tiles (got ${tiles.length})`);
   check((await page.textContent('#identity')) === 'alice@example.com', 'identity from the proxy header is shown');
 
+  const summary = await page.$$eval('#wall-summary span', (spans) => spans.map((s) => s.textContent));
+  check(summary[0] === '4 machines' && /^\d+ up$/.test(summary[1] || ''),
+    `the top bar counts the machines (got ${summary.join(', ') || 'nothing'})`);
+
   // The RFB session should have completed its handshake against fakevnc,
   // which means a canvas exists inside the console tile.
   const canvases = await page.$$('.tile canvas');

@@ -116,10 +116,12 @@ export class Tile {
 
   paintState() {
     const s = this.summary;
-    this.dot.className = 'dot ' + (s.live ? 'live' : s.why ? 'dead' : 'unknown');
+    const state = s.live ? 'live' : s.why ? 'dead' : 'unknown';
+    this.dot.className = `dot ${state}`;
+    this.element.dataset.state = state;
 
     let label = s.live ? 'up' : (s.why || 'unknown');
-    let cls = 'pill';
+    let cls = statePill(s);
     if (s.lease && s.lease.holder) {
       label = `${s.lease.holder} has control`;
       cls = 'pill held';
@@ -161,6 +163,10 @@ export class Tile {
     this.renderer = null;
     this.element.remove();
   }
+}
+
+export function statePill(summary) {
+  return summary.live ? 'pill up' : 'pill';
 }
 
 // SerialTailRenderer shows a machine's serial output in a tile, read-only.

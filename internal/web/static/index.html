@@ -12,6 +12,20 @@
 </head>
 <body>
   <header id="bar">
+    <a id="brand" href="#" aria-label="labview, the wall">
+      <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true">
+        <defs>
+          <linearGradient id="brand-lit" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#7cc4ff"/>
+            <stop offset="1" stop-color="#8f7bff"/>
+          </linearGradient>
+        </defs>
+        <rect x="4" y="4" width="11" height="11" rx="3" fill="url(#brand-lit)"/>
+        <rect class="brand-dim" x="17" y="4" width="11" height="11" rx="3"/>
+        <rect class="brand-dim" x="4" y="17" width="11" height="11" rx="3"/>
+        <rect class="brand-dim" x="17" y="17" width="11" height="11" rx="3"/>
+      </svg>
+    </a>
     <button id="back" class="ghost" hidden>&larr; wall</button>
     <h1 id="title">labview</h1>
     <div id="bar-machine" hidden>
@@ -19,7 +33,8 @@
       <span id="machine-state" class="pill"></span>
     </div>
     <div class="spacer"></div>
-    <span id="identity" class="muted" title="asserted by the reverse proxy"></span>
+    <span id="wall-summary" class="summary" hidden></span>
+    <span id="identity" class="identity" title="asserted by the reverse proxy"></span>
   </header>
 
   <!-- The wall: a grid of live, view-only framebuffers. -->
@@ -33,14 +48,16 @@
     <div id="controls" class="controls">
       <button id="take" class="primary">Take control</button>
       <button id="release" class="ghost" hidden>Release control</button>
-      <span id="control-state" class="muted"></span>
+      <span id="control-state" class="lease"></span>
       <div class="spacer"></div>
       <button id="cad" class="ghost" title="Send Ctrl+Alt+Del">Ctrl+Alt+Del</button>
-      <button id="fullscreen" class="ghost">Full screen</button>
+      <button id="fullscreen" class="ghost"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg>Full screen</button>
       <span class="divider"></span>
-      <button id="power-start" class="ghost">Start</button>
-      <button id="power-stop" class="ghost">Stop</button>
-      <button id="power-restart" class="danger">Restart</button>
+      <div class="group" role="group" aria-label="Power">
+        <button id="power-start"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path class="solid" d="M5 3.2v9.6L12.5 8z"/></svg>Start</button>
+        <button id="power-stop"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect class="solid" x="4" y="4" width="8" height="8" rx="1.5"/></svg>Stop</button>
+        <button id="power-restart" class="danger"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5v3h-3"/></svg>Restart</button>
+      </div>
     </div>
 
     <nav id="tabs" class="tabs"></nav>

@@ -5,7 +5,7 @@
 // only in which tab opens first.
 
 import { api } from './api.js';
-import { Tile } from './tile.js';
+import { Tile, statePill } from './tile.js';
 import { SerialView } from './serial.js';
 import { RecordingPlayer } from './player.js';
 import { renderDetails, renderRecordings, renderActivity } from './tabs.js';
@@ -132,8 +132,19 @@ async function refreshWall() {
   }
 
   $('#wall-empty').hidden = machines.length > 0;
+  paintSummary(machines);
 
   if (state.open) paintExpandedHeader();
+}
+
+function paintSummary(machines) {
+  const node = $('#wall-summary');
+  const up = machines.filter((m) => m.live).length;
+  clear(node);
+  node.append(
+    el('span', { text: `${machines.length} ${machines.length === 1 ? 'machine' : 'machines'}` }),
+    el('span', { class: up ? 'up' : '', text: `${up} up` }));
+  node.hidden = machines.length === 0;
 }
 
 function showWall() {
@@ -209,7 +220,7 @@ function paintExpandedHeader() {
 
   const stateEl = $('#machine-state');
   stateEl.textContent = s.live ? 'up' : (s.why || 'unknown');
-  stateEl.className = 'pill';
+  stateEl.className = statePill(s);
 
   const mine = s.lease && s.lease.holder === state.config.identity;
   state.haveControl = Boolean(mine);
@@ -219,8 +230,10 @@ function paintExpandedHeader() {
     control.textContent = mine
       ? `you have control until ${when(s.lease.expires)}`
       : `${s.lease.holder} has control`;
+    control.className = mine ? 'lease mine' : 'lease held';
   } else {
     control.textContent = 'nobody has control';
+    control.className = 'lease';
   }
 
   $('#take').hidden = Boolean(mine);

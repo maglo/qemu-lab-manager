@@ -283,6 +283,10 @@ Three, no more.
 **Wall.** Grid of live framebuffers, view-only. Machine name, hypervisor, a
 liveness dot. Machines without a console show why.
 
+The top bar is the same in every state. It holds the brand mark, which links
+to the wall, a count of the machines and of the machines that are up, and the
+identity that the proxy asserts.
+
 **Expanded.** One machine fills the viewport, tabbed — see §8 for what the
 tabs hold. Console is the default tab and shows the same RFB session as the
 tile, with `viewOnly` flipped off once the lease is held, so there is no
@@ -300,6 +304,13 @@ and resizes the terminal to match. It watches the element rather than the
 window, because the box changes for reasons no resize event reports: the status
 note takes a line when the first status arrives, and a tab opens. The pane also
 clips, so a renderer that measures itself wrong spills nothing onto the page.
+
+The application is dark only, because it sits next to a terminal. `app.css`
+holds every color as a custom property. noVNC and xterm take their colors as
+arguments, so `app/theme.js` holds the screen color and the terminal palette
+for them. The serial pane, the serial tile and the recording player use that
+one palette. The application loads no web font, because a lab does not reach
+a CDN and the content security policy allows no other origin.
 
 A console is one TCP dial per websocket, so a restart of the machine ends the
 session. The renderer dials again on a backoff, which is what the serial
