@@ -142,7 +142,7 @@ another, and neither gets a privileged path.
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/machines` | Inventory plus liveness and current lease holder |
-| `POST /api/machines` | Create a machine (cluster.md section 4) |
+| `POST /api/machines` | Create a machine, on the node that fits when the node has peers (cluster.md sections 4 and 5) |
 | `GET /api/machines/{id}` | The whole record: details, desired, disks, network, unit, recordings, activity |
 | `PATCH /api/machines/{id}` | Update desired hardware on an API-created machine |
 | `DELETE /api/machines/{id}` | Destroy an API-created machine |
@@ -159,6 +159,7 @@ another, and neither gets a privileged path.
 | `GET /api/telemetry` | NDJSON events for the node and its machines (cluster.md section 6) |
 | `GET /api/cluster/nodes` | The nodes of the cluster: name, source, KVM, ready (cluster.md section 5) |
 | `POST /api/cluster/nodes` | A node registers, or renews its place; needs the cluster token |
+| `GET /api/cluster/capacity` | What this node has free for a new machine (cluster.md section 5) |
 | `GET /api/config` | The settings the browser application needs |
 | `POST /api/scenarios/runs` | Start a scenario run (scenarios.md) |
 | `GET /api/scenarios/runs` | List recent scenario runs |

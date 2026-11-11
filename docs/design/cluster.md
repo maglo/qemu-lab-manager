@@ -9,8 +9,8 @@ document of the console wall, the lease, the serial broker and the HTTP
 surface that already ships. Where the two disagree on scope or deploy,
 this document wins.
 
-Status: slices 1-7 ship. Placement, metrics and the websocket
-forward remain under
+Status: slices 1-8 ship. Metrics and the websocket forward remain
+under
 https://github.com/maglo/qemu-lab-manager/issues/72.
 
 ---
@@ -115,6 +115,7 @@ flags, serial socket, QMP socket, VNC bind.
 
 Create and destroy take the write lease for that id once the machine
 exists. Create of a new id is free; the creator holds the first lease.
+Section 5 says which node gets a new machine.
 
 The console, serial, screenshot and key endpoints stay as
 [`labview.md`](labview.md) section 5 names them.
@@ -266,13 +267,46 @@ URL. A `-peer` node does not report KVM, and it shows as ready.
 
 ### Placement
 
-Issue: https://github.com/maglo/qemu-lab-manager/issues/94.
+`POST /api/machines` on a node that has peers picks the node for the
+new machine. A node with no peer creates the machine on itself, with
+no check.
 
-Each node reports its free memory, CPU count and free disk. `POST
-/api/machines` on the API node picks a ready node that fits the create
-document, and forwards the create. A `node` field in the document
-names the node instead. When no node fits, create fails and names the
-resource that is short. The operator then adds a node.
+Each node reports its capacity on `GET /api/cluster/capacity`:
+
+| Field | Meaning |
+|---|---|
+| `lifecycle` | The node can create a machine. |
+| `kvm` | The node has KVM. |
+| `cpus` | The CPU count of the node. |
+| `memoryFreeMb` | `MemAvailable` of the kernel. |
+| `diskFreeGb` | Free space under the machines directory. |
+
+The API node asks each ready node at the time of the create, so the
+numbers are current. A machine fits a node when all of these hold:
+
+- The node can create a machine, and it has KVM.
+- `memoryMb` is not more than `memoryFreeMb`.
+- `vcpus` is not more than `cpus`. The CPU count is not divided
+  between machines.
+- The sum of the blank disks is not more than `diskFreeGb`. A blank
+  disk is sparse, and it counts in full.
+
+The node with the most free memory takes the machine. This node wins
+a tie. The API node forwards the create document to a peer with the
+cluster token and the identity of the user. The answer carries the id
+as `name:local-id`. A node does not place a create that carries the
+cluster token, so two nodes cannot send a create to each other.
+
+When no node fits, create answers 409. The error names each node and
+the resource that is short on it. The operator then adds a node.
+
+A `node` field next to the create document names the node. Its value
+is a node name, or `local` for the node that gets the request. A named
+node gets the machine with no capacity check.
+
+The numbers are a view of one moment. Two creates at the same time
+can pick the same node. A stopped machine uses no memory, so a node
+can accept more machines than it can run at the same time.
 
 ### Websocket forward
 
@@ -381,8 +415,7 @@ Work lands in this order. Each slice has its own issue under #72.
 6. Scenario object and runner. Document locked (#82). Runner v1
    (https://github.com/maglo/qemu-lab-manager/issues/88).
 7. Join at boot with cloud-init and a checked cluster token. Done.
-8. Placement of a new machine
-   (https://github.com/maglo/qemu-lab-manager/issues/94).
+8. Placement of a new machine. Done.
 9. Prometheus metrics
    (https://github.com/maglo/qemu-lab-manager/issues/95).
 10. Websocket forward to peer machines
